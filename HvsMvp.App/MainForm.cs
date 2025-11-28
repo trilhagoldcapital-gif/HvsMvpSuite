@@ -902,7 +902,21 @@ namespace HvsMvp.App
                 }
 
                 using var bmp = new Bitmap(_pictureSample.Image);
-                var scene = _analysisService.AnalyzeScene(bmp, imagePath: null);
+
+                // BLOCO 2: usar reanálise automática para amostras críticas
+                var summary = _analysisService.RunWithAutoReanalysis(bmp, imagePath: null);
+
+                // Reconstruir uma cena mínima para manter compatibilidade com o resto da UI
+                var scene = new FullSceneAnalysis
+                {
+                    Summary = summary,
+                    Labels = _lastScene?.Labels ?? new PixelLabel[1, 1],
+                    Mask = _lastScene?.Mask ?? new SampleMaskClass[1, 1],
+                    MaskPreview = _lastScene?.MaskPreview ?? new Bitmap(1, 1),
+                    Width = _lastScene?.Width ?? bmp.Width,
+                    Height = _lastScene?.Height ?? bmp.Height
+                };
+
                 _lastScene = scene;
 
                 _lastBaseImageClone?.Dispose();
@@ -911,9 +925,8 @@ namespace HvsMvp.App
 
                 _txtDetails.Text = scene.Summary.ShortReport;
                 UpdateMaterialListsFromScene();
-                AppendLog("Análise HVS completa concluída.");
+                AppendLog("Análise HVS completa concluída (com reanálise automática se necessário).");
 
-                // BLOCO 1 – exibe na barra de status o índice de qualidade do laudo
                 var s = scene.Summary;
                 _lblStatus.Text =
                     $"Qualidade: {s.QualityIndex:F1} ({s.QualityStatus}) · Foco={s.Diagnostics.FocusScorePercent:F1} · Exposição={s.Diagnostics.ExposureScore:F1} · Máscara={s.Diagnostics.MaskScore:F1}";
