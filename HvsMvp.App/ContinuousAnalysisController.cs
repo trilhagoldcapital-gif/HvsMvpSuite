@@ -1,31 +1,34 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace HvsMvp.App
 {
-    // Controlador de análise contínua não bloqueante (thread-safe)
+    /// <summary>
+    /// Non-blocking continuous analysis controller (thread-safe).
+    /// Periodically captures frames and runs analysis.
+    /// </summary>
     public class ContinuousAnalysisController
     {
-        private readonly Func<Bitmap> _frameProvider;
-        private readonly Func<Bitmap, (SampleFullAnalysisResult analysis, SampleMaskClass[,] mask, Bitmap maskPreview)> _analyzer;
+        private readonly Func<Bitmap?> _frameProvider;
+        private readonly Func<Bitmap, (SampleFullAnalysisResult analysis, SampleMaskClass?[,] mask, Bitmap maskPreview)> _analyzer;
         private readonly int _intervalMs;
 
-        private CancellationTokenSource _cts;
-        private Task _loopTask;
+        private CancellationTokenSource? _cts;
+        private Task? _loopTask;
         private volatile bool _busy;
 
-        public event Action<SampleFullAnalysisResult> AnalysisCompleted;
+        public event Action<SampleFullAnalysisResult>? AnalysisCompleted;
 
         public ContinuousAnalysisController(
-            Func<Bitmap> frameProvider,
-            Func<Bitmap, (SampleFullAnalysisResult, SampleMaskClass[,], Bitmap)> analyzer,
+            Func<Bitmap?> frameProvider,
+            Func<Bitmap, (SampleFullAnalysisResult, SampleMaskClass?[,], Bitmap)> analyzer,
             int intervalMs = 800)
         {
-            _frameProvider = frameProvider;
-            _analyzer = analyzer;
-            _intervalMs = intervalMs;
+            _frameProvider = frameProvider ?? throw new ArgumentNullException(nameof(frameProvider));
+            _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
+            _intervalMs = intervalMs > 0 ? intervalMs : 800;
         }
 
         public void Start()
@@ -61,7 +64,7 @@ namespace HvsMvp.App
                         continue;
                     }
 
-                    Bitmap frame = null;
+                    Bitmap? frame = null;
                     try
                     {
                         frame = _frameProvider?.Invoke();
@@ -71,13 +74,13 @@ namespace HvsMvp.App
                             continue;
                         }
 
-                        _busy = true; // evita concorrência
+                        _busy = true;
                         var result = _analyzer(frame);
                         AnalysisCompleted?.Invoke(result.analysis);
                     }
                     catch
                     {
-                        // silencioso
+                        // Silently ignore analysis errors
                     }
                     finally
                     {
@@ -91,9 +94,17 @@ namespace HvsMvp.App
                 }
                 catch
                 {
+                    // Ignore other exceptions
                 }
 
-                await Task.Delay(_intervalMs, ct);
+                try
+                {
+                    await Task.Delay(_intervalMs, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
     }
