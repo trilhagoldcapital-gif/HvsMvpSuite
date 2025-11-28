@@ -62,6 +62,9 @@ namespace HvsMvp.App
         private Button _btnStopContinuous = null!;
         private Button _btnMask = null!;
         private Button _btnMaskBg = null!;
+        private Button _btnPhaseMap = null!;   // NEW: Phase map visualization
+        private Button _btnHeatmap = null!;     // NEW: Target heatmap
+        private Button _btnTraining = null!;    // NEW: Training mode toggle
         private Button _btnAi = null!;
         private Button _btnZoomIn = null!;
         private Button _btnZoomOut = null!;
@@ -79,6 +82,10 @@ namespace HvsMvp.App
         private Button _btnSettings = null!;
         private Button _btnAbout = null!;
         private Button _btnWhatsApp = null!;
+
+        // Services for new features
+        private PhaseMapService _phaseMapService = new PhaseMapService();
+        private TrainingModeService _trainingService = new TrainingModeService();
 
         // Quality checklist panel
         private QualityChecklistPanel _qualityPanel = null!;
@@ -114,6 +121,9 @@ namespace HvsMvp.App
                     ["btn.cont.stop"] = "⏸ Parar contínuo",
                     ["btn.mask"] = "🎨 Máscara",
                     ["btn.mask.bg"] = "🖼 Fundo mascarado",
+                    ["btn.phase.map"] = "🗺 Mapa de Fases",
+                    ["btn.heatmap"] = "🔥 Heatmap Alvo",
+                    ["btn.training"] = "🎯 Modo Treino",
                     ["btn.ai"] = "🔬 Partículas / Dataset IA",
                     ["btn.zoom.in"] = "🔍 Zoom +",
                     ["btn.zoom.out"] = "🔎 Zoom -",
@@ -145,6 +155,9 @@ namespace HvsMvp.App
                     ["btn.cont.stop"] = "⏸ Stop continuous",
                     ["btn.mask"] = "🎨 Mask",
                     ["btn.mask.bg"] = "🖼 Background masked",
+                    ["btn.phase.map"] = "🗺 Phase Map",
+                    ["btn.heatmap"] = "🔥 Target Heatmap",
+                    ["btn.training"] = "🎯 Training Mode",
                     ["btn.ai"] = "🔬 Particles / AI Dataset",
                     ["btn.zoom.in"] = "🔍 Zoom +",
                     ["btn.zoom.out"] = "🔎 Zoom -",
@@ -435,6 +448,16 @@ namespace HvsMvp.App
             _btnMaskBg.Click += BtnFundoMasc_Click;
             _toolbarRow1.Controls.Add(_btnMaskBg);
 
+            // NEW: Phase Map button
+            _btnPhaseMap = Cmd("");
+            _btnPhaseMap.Click += BtnPhaseMap_Click;
+            _toolbarRow1.Controls.Add(_btnPhaseMap);
+
+            // NEW: Heatmap button
+            _btnHeatmap = Cmd("");
+            _btnHeatmap.Click += BtnHeatmap_Click;
+            _toolbarRow1.Controls.Add(_btnHeatmap);
+
             _btnAi = Cmd("");
             _btnAi.Click += BtnParticulas_Click;
             _toolbarRow2.Controls.Add(_btnAi);
@@ -492,7 +515,7 @@ namespace HvsMvp.App
             _btnCalib.Click += BtnCalibrarAuto_Click;
             _toolbarRow2.Controls.Add(_btnCalib);
 
-            // Third row: Settings, About, WhatsApp sharing
+            // Third row: Settings, About, WhatsApp sharing, Training Mode
             _btnSettings = Cmd("⚙️ Configurações");
             _btnSettings.Click += BtnSettings_Click;
             _toolbarRow3.Controls.Add(_btnSettings);
@@ -504,6 +527,11 @@ namespace HvsMvp.App
             _btnWhatsApp = Cmd("📱 WhatsApp");
             _btnWhatsApp.Click += BtnWhatsApp_Click;
             _toolbarRow3.Controls.Add(_btnWhatsApp);
+
+            // NEW: Training mode button
+            _btnTraining = Cmd("");
+            _btnTraining.Click += BtnTraining_Click;
+            _toolbarRow3.Controls.Add(_btnTraining);
 
             _mainVerticalSplit = new SplitContainer
             {
@@ -743,6 +771,9 @@ namespace HvsMvp.App
             _btnStopContinuous.Text = t["btn.cont.stop"];
             _btnMask.Text = t["btn.mask"];
             _btnMaskBg.Text = t["btn.mask.bg"];
+            _btnPhaseMap.Text = t["btn.phase.map"];
+            _btnHeatmap.Text = t["btn.heatmap"];
+            _btnTraining.Text = t["btn.training"];
             _btnAi.Text = t["btn.ai"];
             _btnZoomIn.Text = t["btn.zoom.in"];
             _btnZoomOut.Text = t["btn.zoom.out"];
@@ -758,6 +789,9 @@ namespace HvsMvp.App
             _btnDebugHvs.Text = t["btn.debug"];
             _btnCalib.Text = t["btn.calib"];
             _btnLanguage.Text = $"Idioma ({_currentLocale}) ▾";
+
+            // Update training mode button state
+            UpdateTrainingModeButton();
         }
 
         private void InitializeCameraEvents()
@@ -1436,6 +1470,193 @@ namespace HvsMvp.App
 
             _zoomFactor = 1.0f;
             ApplyZoom();
+        }
+
+        // ===== Phase Map visualization =====
+        private void BtnPhaseMap_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_lastScene == null)
+                {
+                    AppendLog("Nenhuma análise disponível. Execute uma análise primeiro.");
+                    return;
+                }
+
+                var phaseMap = _phaseMapService.GeneratePhaseMap(_lastScene);
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = phaseMap;
+
+                _showMask = _showMaskedBackground = _showSelectiveMask = false;
+                _zoomFactor = 1.0f;
+                ApplyZoom();
+
+                AppendLog("Visualização: Mapa de Fases por material.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao gerar mapa de fases: {ex.Message}");
+            }
+        }
+
+        // ===== Target Heatmap visualization =====
+        private void BtnHeatmap_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_lastScene == null || _lastBaseImageClone == null)
+                {
+                    AppendLog("Nenhuma análise disponível. Execute uma análise primeiro.");
+                    return;
+                }
+
+                // Get selected target from combo
+                string targetId = "Au"; // Default
+                if (_cbTarget?.SelectedItem != null)
+                {
+                    string sel = _cbTarget.SelectedItem.ToString() ?? "";
+                    if (sel.Contains(":"))
+                    {
+                        targetId = sel.Split(':')[1].Trim();
+                    }
+                }
+
+                // Map common names to IDs
+                if (targetId.Contains("Ouro") || targetId.Contains("Gold")) targetId = "Au";
+                else if (targetId.Contains("Platina") || targetId.Contains("Platinum")) targetId = "Pt";
+
+                using var baseImg = new Bitmap(_lastBaseImageClone);
+                var heatmap = _phaseMapService.GenerateTargetHeatmap(baseImg, _lastScene, targetId, 0.6);
+
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = heatmap;
+
+                _showMask = _showMaskedBackground = _showSelectiveMask = false;
+                _zoomFactor = 1.0f;
+                ApplyZoom();
+
+                AppendLog($"Visualização: Heatmap para alvo '{targetId}'.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao gerar heatmap: {ex.Message}");
+            }
+        }
+
+        // ===== Training Mode =====
+        private void BtnTraining_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_trainingService.IsSessionActive)
+                {
+                    // End training session
+                    var exportPath = _trainingService.EndSession();
+                    if (!string.IsNullOrEmpty(exportPath))
+                    {
+                        AppendLog($"Sessão de treino finalizada. Dados exportados: {exportPath}");
+                    }
+                    else
+                    {
+                        AppendLog("Sessão de treino finalizada (sem dados).");
+                    }
+
+                    // Remove click handler from picture
+                    _pictureSample.MouseClick -= PictureSample_TrainingClick;
+                }
+                else
+                {
+                    // Start training session
+                    _trainingService.StartSession(_appSettings.DefaultOperator);
+                    AppendLog("Modo de treino ativado. Clique em partículas para rotulá-las.");
+
+                    // Add click handler for labeling
+                    _pictureSample.MouseClick += PictureSample_TrainingClick;
+                }
+
+                UpdateTrainingModeButton();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro no modo de treino: {ex.Message}");
+            }
+        }
+
+        private void UpdateTrainingModeButton()
+        {
+            if (_btnTraining == null) return;
+
+            if (_trainingService.IsSessionActive)
+            {
+                _btnTraining.BackColor = Color.FromArgb(120, 60, 60);
+                _btnTraining.Text = "⏹ Parar Treino";
+            }
+            else
+            {
+                _btnTraining.BackColor = Color.FromArgb(20, 40, 65);
+                _btnTraining.Text = _i18n[_currentLocale]["btn.training"];
+            }
+        }
+
+        private void PictureSample_TrainingClick(object? sender, MouseEventArgs e)
+        {
+            if (!_trainingService.IsSessionActive || _lastScene == null)
+                return;
+
+            // Translate mouse coordinates to image coordinates
+            if (!TryTranslateToImagePoint(_pictureSample, e.Location, out var imgPt))
+            {
+                AppendLog("Clique fora da imagem.");
+                return;
+            }
+
+            // Show label selection dialog
+            using var dlg = new Form
+            {
+                Text = "Rotular Partícula",
+                Size = new Size(300, 200),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            var lbl = new Label
+            {
+                Text = $"Posição: ({imgPt.X}, {imgPt.Y})\nSelecione o material:",
+                AutoSize = true,
+                Location = new Point(12, 12)
+            };
+            dlg.Controls.Add(lbl);
+
+            var combo = new ComboBox
+            {
+                Location = new Point(12, 60),
+                Width = 260,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            foreach (var label in TrainingModeService.AvailableLabels)
+            {
+                combo.Items.Add(label);
+            }
+            combo.SelectedIndex = 0;
+            dlg.Controls.Add(combo);
+
+            var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(100, 120), Width = 80 };
+            var btnCancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Location = new Point(190, 120), Width = 80 };
+            dlg.Controls.Add(btnOk);
+            dlg.Controls.Add(btnCancel);
+            dlg.AcceptButton = btnOk;
+            dlg.CancelButton = btnCancel;
+
+            if (dlg.ShowDialog(this) == DialogResult.OK && combo.SelectedItem != null)
+            {
+                string selectedLabel = combo.SelectedItem.ToString() ?? "Unknown";
+                _trainingService.AddExampleFromClick(imgPt.X, imgPt.Y, selectedLabel, _lastScene);
+
+                var (total, byLabel) = _trainingService.GetSessionStats();
+                AppendLog($"Partícula rotulada como '{selectedLabel}'. Total na sessão: {total}");
+            }
         }
 
         private void BtnParticulas_Click(object? sender, EventArgs e)
