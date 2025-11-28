@@ -14,13 +14,18 @@ namespace HvsMvp.App
     {
         private HvsConfig? _config;
         private HvsAnalysisService? _analysisService;
+        private AppSettings _appSettings = null!;
 
         // Cena completa da última análise
         private FullSceneAnalysis? _lastScene;
 
+        // Last exported report path for sharing
+        private string? _lastExportedReportPath;
+
         private Panel _topContainer = null!;
         private FlowLayoutPanel _toolbarRow1 = null!;
         private FlowLayoutPanel _toolbarRow2 = null!;
+        private FlowLayoutPanel _toolbarRow3 = null!;
         private Panel _headerBar = null!;
         private Label _lblTitle = null!;
         private Button _btnLanguage = null!;
@@ -71,6 +76,15 @@ namespace HvsMvp.App
         private Button _btnExportIa = null!;   // NOVO: export dataset IA
         private Button _btnDebugHvs = null!;
         private Button _btnCalib = null!;
+        private Button _btnSettings = null!;
+        private Button _btnAbout = null!;
+        private Button _btnWhatsApp = null!;
+
+        // Quality checklist panel
+        private QualityChecklistPanel _qualityPanel = null!;
+
+        // Footer version label
+        private Label _lblVersion = null!;
 
         private readonly ToolTip _hvsToolTip = new ToolTip { IsBalloon = false, UseAnimation = true, UseFading = true };
 
@@ -172,12 +186,23 @@ namespace HvsMvp.App
             MinimumSize = new Size(1280, 720);
             BackColor = Color.FromArgb(5, 10, 20);
 
+            // Load app settings
+            _appSettings = AppSettings.Load();
+
+            // Apply settings to camera
+            _cameraIndex = _appSettings.DefaultCameraIndex;
+            _cameraWidth = _appSettings.GetResolutionWidth();
+            _cameraHeight = _appSettings.GetResolutionHeight();
+
             LoadHvsConfig();
             InitializeLayout();
             InitializeCameraEvents();
             PopulateMaterials();
 
             FormClosing += MainForm_FormClosing;
+
+            // Check for updates on startup if enabled
+            CheckForUpdatesOnStartupAsync();
         }
 
         private void LoadHvsConfig()
@@ -214,7 +239,7 @@ namespace HvsMvp.App
             _topContainer = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 140,
+                Height = 170,
                 BackColor = Color.FromArgb(8, 16, 28)
             };
             Controls.Add(_topContainer);
@@ -223,11 +248,12 @@ namespace HvsMvp.App
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 3
+                RowCount = 4
             };
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 30));
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 15));
             _topContainer.Controls.Add(topLayout);
 
             var toolbarPanel1 = new Panel
@@ -264,13 +290,31 @@ namespace HvsMvp.App
             };
             toolbarPanel2.Controls.Add(_toolbarRow2);
 
+            // Third toolbar row for settings, about, and sharing
+            var toolbarPanel3 = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(12, 24, 40),
+                Padding = new Padding(6, 0, 6, 2)
+            };
+            topLayout.Controls.Add(toolbarPanel3, 0, 2);
+
+            _toolbarRow3 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = true
+            };
+            toolbarPanel3.Controls.Add(_toolbarRow3);
+
             _headerBar = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(200, 160, 60),
                 Padding = new Padding(16, 4, 16, 4)
             };
-            topLayout.Controls.Add(_headerBar, 0, 2);
+            topLayout.Controls.Add(_headerBar, 0, 3);
 
             var headerLayout = new TableLayoutPanel
             {
@@ -448,6 +492,19 @@ namespace HvsMvp.App
             _btnCalib.Click += BtnCalibrarAuto_Click;
             _toolbarRow2.Controls.Add(_btnCalib);
 
+            // Third row: Settings, About, WhatsApp sharing
+            _btnSettings = Cmd("⚙️ Configurações");
+            _btnSettings.Click += BtnSettings_Click;
+            _toolbarRow3.Controls.Add(_btnSettings);
+
+            _btnAbout = Cmd("ℹ️ Sobre");
+            _btnAbout.Click += BtnAbout_Click;
+            _toolbarRow3.Controls.Add(_btnAbout);
+
+            _btnWhatsApp = Cmd("📱 WhatsApp");
+            _btnWhatsApp.Click += BtnWhatsApp_Click;
+            _toolbarRow3.Controls.Add(_btnWhatsApp);
+
             _mainVerticalSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
@@ -530,10 +587,11 @@ namespace HvsMvp.App
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 2
+                RowCount = 3
             };
             _materialsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             _materialsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            _materialsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 150));
             _rightPanel.Controls.Add(_materialsLayout);
 
             var matHeader = new Panel
@@ -604,6 +662,13 @@ namespace HvsMvp.App
             _listGems = listGe;
             columns.Controls.Add(colGe, 2, 0);
 
+            // Quality Checklist Panel
+            _qualityPanel = new QualityChecklistPanel
+            {
+                Dock = DockStyle.Fill
+            };
+            _materialsLayout.Controls.Add(_qualityPanel, 0, 2);
+
             _listMetals.SelectedIndexChanged += (s, e) =>
                 ShowMaterialDetails(_config?.Materials?.Metais?.ElementAtOrDefault(_listMetals.SelectedIndex));
 
@@ -643,6 +708,17 @@ namespace HvsMvp.App
                 TextAlign = ContentAlignment.MiddleLeft
             };
             _footerPanel.Controls.Add(_lblStatus);
+
+            // Version label in footer
+            _lblVersion = new Label
+            {
+                ForeColor = Color.FromArgb(120, 130, 150),
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleRight,
+                Text = $"v{UpdateService.GetCurrentVersion()}"
+            };
+            _footerPanel.Controls.Add(_lblVersion);
 
             ApplyLocaleTexts();
             lblAlvo.Text = _i18n[_currentLocale]["label.target"];
@@ -947,6 +1023,12 @@ namespace HvsMvp.App
                 var s = scene.Summary;
                 _lblStatus.Text =
                     $"Qualidade: {s.QualityIndex:F1} ({s.QualityStatus}) · Foco={s.Diagnostics.FocusScorePercent:F1} · Exposição={s.Diagnostics.ExposureScore:F1} · Máscara={s.Diagnostics.MaskScore:F1}";
+
+                // Update quality checklist panel
+                _qualityPanel.UpdateFromDiagnostics(s.Diagnostics);
+
+                // Clear last exported report path since we have new analysis
+                _lastExportedReportPath = null;
             }
             catch (Exception ex)
             {
@@ -1438,10 +1520,24 @@ namespace HvsMvp.App
 
             try
             {
-                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+                string dir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
+                    ? _appSettings.ReportsDirectory
+                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
                 Directory.CreateDirectory(dir);
+
                 string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".txt");
-                File.WriteAllText(path, _lastScene.Summary.ShortReport, Encoding.UTF8);
+
+                // Build report with version and lab info
+                var sb = new StringBuilder();
+                sb.AppendLine($"Versão do MicroLab: v{UpdateService.GetCurrentVersion()}");
+                sb.AppendLine($"Laboratório: {_appSettings.LabName}");
+                if (!string.IsNullOrWhiteSpace(_appSettings.DefaultOperator))
+                    sb.AppendLine($"Operador: {_appSettings.DefaultOperator}");
+                sb.AppendLine();
+                sb.Append(_lastScene.Summary.ShortReport);
+
+                File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+                _lastExportedReportPath = path;
                 AppendLog("Exportado TXT: " + path);
             }
             catch (Exception ex)
@@ -1903,6 +1999,9 @@ namespace HvsMvp.App
             UpdateMaterialListsFromScene();
             _lblStatus.Text =
                 $"Contínuo: foco={result.Diagnostics.FocusScore:F2} · Qualidade={result.QualityIndex:F1} ({result.QualityStatus})";
+
+            // Update quality panel
+            _qualityPanel.UpdateFromDiagnostics(result.Diagnostics);
         }
 
         private Bitmap? SafeGetCurrentFrameClone()
@@ -1910,6 +2009,138 @@ namespace HvsMvp.App
             if (_pictureSample?.Image == null) return null;
             try { return (Bitmap)_pictureSample.Image.Clone(); }
             catch { return null; }
+        }
+
+        // ===== New functionality handlers =====
+
+        private void BtnSettings_Click(object? sender, EventArgs e)
+        {
+            using var settingsForm = new SettingsForm(_appSettings);
+            if (settingsForm.ShowDialog(this) == DialogResult.OK)
+            {
+                // Reload settings
+                _appSettings = AppSettings.Load();
+
+                // Apply camera settings
+                _cameraIndex = _appSettings.DefaultCameraIndex;
+                _cameraWidth = _appSettings.GetResolutionWidth();
+                _cameraHeight = _appSettings.GetResolutionHeight();
+
+                AppendLog("Configurações salvas e aplicadas.");
+            }
+        }
+
+        private void BtnAbout_Click(object? sender, EventArgs e)
+        {
+            using var aboutForm = new AboutForm(_appSettings);
+            aboutForm.ShowDialog(this);
+        }
+
+        private void BtnWhatsApp_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_lastScene?.Summary == null)
+                {
+                    AppendLog("Nenhuma análise disponível para compartilhar. Execute uma análise primeiro.");
+                    return;
+                }
+
+                // Get sample name from image path or use default
+                string sampleName = "Amostra";
+                if (!string.IsNullOrWhiteSpace(_lastScene.Summary.ImagePath))
+                {
+                    sampleName = Path.GetFileNameWithoutExtension(_lastScene.Summary.ImagePath);
+                }
+                else
+                {
+                    sampleName = $"Análise_{_lastScene.Summary.Id:N}";
+                }
+
+                // If there's no exported report, export one first
+                if (string.IsNullOrWhiteSpace(_lastExportedReportPath) || !File.Exists(_lastExportedReportPath))
+                {
+                    // Auto-export TXT
+                    string dir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
+                        ? _appSettings.ReportsDirectory
+                        : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+                    Directory.CreateDirectory(dir);
+
+                    string path = Path.Combine(dir, "laudo_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".txt");
+
+                    // Build report with version info
+                    var reportText = $"Versão do MicroLab: v{UpdateService.GetCurrentVersion()}\n" +
+                                     $"Laboratório: {_appSettings.LabName}\n" +
+                                     $"Operador: {_appSettings.DefaultOperator}\n\n" +
+                                     _lastScene.Summary.ShortReport;
+
+                    File.WriteAllText(path, reportText, Encoding.UTF8);
+                    _lastExportedReportPath = path;
+                    AppendLog($"Laudo exportado automaticamente: {path}");
+                }
+
+                WhatsAppService.ShareReport(sampleName, _lastExportedReportPath, _appSettings);
+                AppendLog("WhatsApp Web aberto. Arraste o arquivo do laudo para a conversa.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao compartilhar via WhatsApp: {ex.Message}");
+            }
+        }
+
+        private async void CheckForUpdatesOnStartupAsync()
+        {
+            try
+            {
+                if (!_appSettings.AutoUpdateCheckEnabled)
+                    return;
+
+                // Check if we should check (based on frequency)
+                if (_appSettings.LastUpdateCheck.HasValue)
+                {
+                    var hoursSinceLastCheck = (DateTime.Now - _appSettings.LastUpdateCheck.Value).TotalHours;
+                    if (hoursSinceLastCheck < _appSettings.UpdateCheckFrequencyHours)
+                        return;
+                }
+
+                var updateService = new UpdateService();
+                var (hasUpdate, latestVersion, errorMessage) = await updateService.CheckForUpdatesAsync();
+
+                _appSettings.LastUpdateCheck = DateTime.Now;
+
+                if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    _appSettings.LastUpdateResult = "Error";
+                }
+                else if (hasUpdate)
+                {
+                    _appSettings.LastUpdateResult = "UpdateAvailable";
+                    _appSettings.LatestVersionFound = latestVersion;
+
+                    // Show notification to user
+                    var result = MessageBox.Show(
+                        this,
+                        $"Nova versão disponível: {latestVersion}\n\nDeseja abrir a página de download?",
+                        "Atualização Disponível",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Information);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        updateService.OpenReleasesPage();
+                    }
+                }
+                else
+                {
+                    _appSettings.LastUpdateResult = "NoUpdate";
+                }
+
+                _appSettings.Save();
+            }
+            catch
+            {
+                // Silent fail on startup update check
+            }
         }
     }
 }
