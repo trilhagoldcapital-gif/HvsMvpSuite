@@ -101,24 +101,23 @@ namespace HvsMvp.App
                     welcomeScreen.Load += (s, e) =>
                     {
                         // Safety: ensure form becomes visible after a delay even if animation fails
-                        Task.Delay(500).ContinueWith(_ =>
+                        // Use a timer instead of Task.Delay for better control and cleanup
+                        var visibilityTimer = new System.Windows.Forms.Timer { Interval = 500 };
+                        visibilityTimer.Tick += (ts, te) =>
                         {
+                            visibilityTimer.Stop();
+                            visibilityTimer.Dispose();
                             try
                             {
                                 if (!welcomeScreen.IsDisposed && welcomeScreen.Opacity < 0.5)
                                 {
-                                    welcomeScreen.BeginInvoke(new Action(() =>
-                                    {
-                                        if (!welcomeScreen.IsDisposed)
-                                        {
-                                            welcomeScreen.Opacity = 1.0;
-                                            LogStartupInfo("WelcomeScreen forced visible (animation fallback).");
-                                        }
-                                    }));
+                                    welcomeScreen.Opacity = 1.0;
+                                    LogStartupInfo("WelcomeScreen forced visible (animation fallback).");
                                 }
                             }
-                            catch { }
-                        });
+                            catch { } // Ignore errors if form is disposed
+                        };
+                        visibilityTimer.Start();
                     };
                     
                     // PR14: Ensure welcome screen is positioned on-screen

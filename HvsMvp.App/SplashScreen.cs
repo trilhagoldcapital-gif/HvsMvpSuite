@@ -192,11 +192,15 @@ namespace HvsMvp.App
             {
                 visibilityTimer.Stop();
                 visibilityTimer.Dispose();
-                if (!IsDisposed && !_fadingOut && Opacity < 0.9)
+                try
                 {
-                    Opacity = 1.0;
-                    _fadingIn = false;
+                    if (!IsDisposed && !_fadingOut && Opacity < 0.9)
+                    {
+                        Opacity = 1.0;
+                        _fadingIn = false;
+                    }
                 }
+                catch { } // Ignore errors if form is disposed
             };
             visibilityTimer.Start();
         }

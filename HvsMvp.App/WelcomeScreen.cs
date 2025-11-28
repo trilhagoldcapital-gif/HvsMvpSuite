@@ -90,13 +90,31 @@ namespace HvsMvp.App
                 {
                     visibilityTimer.Stop();
                     visibilityTimer.Dispose();
-                    if (!IsDisposed && Opacity < 0.9)
+                    try
                     {
-                        Opacity = 1.0;
-                        _fadingIn = false;
+                        if (!IsDisposed && Opacity < 0.9)
+                        {
+                            Opacity = 1.0;
+                            _fadingIn = false;
+                        }
                     }
+                    catch { } // Ignore errors if form is disposed
                 };
                 visibilityTimer.Start();
+            };
+            
+            // PR15: Ensure visibility timer is cleaned up on form close
+            FormClosing += (s, e) =>
+            {
+                // Timers are already stopped in OnFormClosing, but ensure visibility
+                try
+                {
+                    if (Opacity < 0.5 && !IsDisposed)
+                    {
+                        Opacity = 1.0;
+                    }
+                }
+                catch { }
             };
         }
 
