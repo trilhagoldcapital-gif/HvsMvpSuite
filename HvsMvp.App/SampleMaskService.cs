@@ -57,6 +57,16 @@ namespace HvsMvp.App
         private const double MaxForegroundFraction = 0.95;  // Máximo 95% de amostra
         private const int MaxFragmentationRegions = 100;    // Máximo de regiões antes de alertar
 
+        // RGB to Grayscale weights (ITU-R BT.601 standard)
+        private const double GrayWeightR = 0.299;
+        private const double GrayWeightG = 0.587;
+        private const double GrayWeightB = 0.114;
+
+        // Composite index weights for segmentation
+        private const double GrayComponentWeight = 0.5;
+        private const double GradientComponentWeight = 0.35;
+        private const double SaturationComponentWeight = 0.15;
+
         /// <summary>
         /// API antiga: retorna matriz e preview por out.
         /// </summary>
@@ -119,8 +129,8 @@ namespace HvsMvp.App
                         byte G = buf[off + 1];
                         byte R = buf[off + 2];
 
-                        // Gray value
-                        int g = (int)(0.299 * R + 0.587 * G + 0.114 * B);
+                        // Gray value using ITU-R BT.601 weights
+                        int g = (int)(GrayWeightR * R + GrayWeightG * G + GrayWeightB * B);
                         g = Math.Max(0, Math.Min(255, g));
                         gray[x, y] = (byte)g;
 
@@ -148,8 +158,10 @@ namespace HvsMvp.App
 
                         grad[x, y] = mag;
 
-                        // Índice composto: darker + textured + saturated
-                        double idx = (255 - gC) * 0.5 + mag * 0.35 + saturation[x, y] * 255 * 0.15;
+                        // Composite index: darker + textured + saturated
+                        double idx = (255 - gC) * GrayComponentWeight +
+                                     mag * GradientComponentWeight +
+                                     saturation[x, y] * 255 * SaturationComponentWeight;
                         sumG += idx;
                         sumG2 += idx * idx;
                         count++;
@@ -188,7 +200,9 @@ namespace HvsMvp.App
                     double mag = grad[x, y];
                     double sat = saturation[x, y];
 
-                    double idx = (255 - gv) * 0.5 + mag * 0.35 + sat * 255 * 0.15;
+                    double idx = (255 - gv) * GrayComponentWeight +
+                                 mag * GradientComponentWeight +
+                                 sat * 255 * SaturationComponentWeight;
                     bool isSample = idx >= threshold;
                     bin[x, y] = isSample;
 

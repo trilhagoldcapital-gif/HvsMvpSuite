@@ -134,9 +134,10 @@ namespace HvsMvp.App
 
                     exported++;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Continuar com próxima partícula
+                    // Log export failure but continue with next particle
+                    System.Diagnostics.Debug.WriteLine($"Failed to export particle {particle.ParticleId}: {ex.Message}");
                 }
             }
 

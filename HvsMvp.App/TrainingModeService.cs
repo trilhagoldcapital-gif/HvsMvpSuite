@@ -106,6 +106,11 @@ namespace HvsMvp.App
         private readonly string _trainingDataDir;
 
         /// <summary>
+        /// Tolerance in pixels for click-to-particle matching.
+        /// </summary>
+        private const int ClickTolerancePixels = 100;
+
+        /// <summary>
         /// Lista de materiais disponíveis para rotulação.
         /// </summary>
         public static readonly string[] AvailableLabels = new[]
@@ -246,7 +251,7 @@ namespace HvsMvp.App
                 }
             }
 
-            if (nearestParticle != null && minDist < 100) // Tolerância de 100 pixels
+            if (nearestParticle != null && minDist < ClickTolerancePixels)
             {
                 AddExample(nearestParticle, manualLabel, scene.Summary.Id, operatorName, notes);
             }
@@ -384,9 +389,10 @@ namespace HvsMvp.App
                     if (session != null)
                         sessions.Add(session);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignorar arquivos corrompidos
+                    // Log corrupted files - silently continue to allow loading other sessions
+                    System.Diagnostics.Debug.WriteLine($"Failed to load training session from {file}: {ex.Message}");
                 }
             }
 

@@ -87,15 +87,22 @@ namespace HvsMvp.App
         public bool IsUsingRealModel => false;
         public string ModelInfo => "HVS-Heuristic-Stub-v1.0";
 
-        // Materiais conhecidos com suas faixas HSV típicas
+        // Material HSV ranges - these should ideally come from configuration
+        // but are kept here for the stub implementation
+        // Format: (hMin, hMax, sMin, sMax, vMin, vMax)
         private static readonly Dictionary<string, (double hMin, double hMax, double sMin, double sMax, double vMin, double vMax)> MaterialRanges =
             new Dictionary<string, (double, double, double, double, double, double)>
             {
-                ["Au"] = (30, 80, 0.18, 1.0, 0.35, 1.0),      // Ouro: amarelo/dourado
-                ["Pt"] = (0, 360, 0.0, 0.20, 0.20, 0.92),     // Platina: cinza/neutro
-                ["Sulfeto"] = (20, 60, 0.3, 0.8, 0.2, 0.7),   // Sulfetos: amarelo/laranja
-                ["Silicato"] = (180, 240, 0.1, 0.5, 0.3, 0.8), // Silicatos: azul/ciano
-                ["Ganga"] = (0, 360, 0.0, 0.15, 0.4, 0.9),    // Ganga: cores neutras
+                // Gold: yellow/golden tones
+                ["Au"] = (30, 80, 0.18, 1.0, 0.35, 1.0),
+                // Platinum: gray/neutral tones with low saturation
+                ["Pt"] = (0, 360, 0.0, 0.20, 0.20, 0.92),
+                // Sulfides: yellow/orange tones
+                ["Sulfeto"] = (20, 60, 0.3, 0.8, 0.2, 0.7),
+                // Silicates: blue/cyan tones
+                ["Silicato"] = (180, 240, 0.1, 0.5, 0.3, 0.8),
+                // Gangue: neutral colors with low saturation
+                ["Ganga"] = (0, 360, 0.0, 0.15, 0.4, 0.9),
             };
 
         public AiClassificationResult ClassifyPixel(PixelFeatures features)

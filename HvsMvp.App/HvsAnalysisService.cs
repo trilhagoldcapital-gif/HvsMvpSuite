@@ -11,6 +11,10 @@ namespace HvsMvp.App
     {
         private readonly HvsConfig _config;
 
+        // Constants for particle segmentation
+        private const int MinParticleSizeAbsolute = 20;
+        private const int MinParticleSizeDivisor = 50000;
+
         public HvsAnalysisService(HvsConfig config)
         {
             _config = config;
@@ -404,7 +408,7 @@ namespace HvsMvp.App
             int[] dy = { -1, -1, -1, 0, 0, 1, 1, 1 };
 
             var queue = new Queue<(int x, int y)>();
-            int minParticleSize = Math.Max(20, (w * h) / 50000); // Mínimo dinâmico
+            int minParticleSize = Math.Max(MinParticleSizeAbsolute, (w * h) / MinParticleSizeDivisor);
 
             for (int y = 0; y < h; y++)
             {
