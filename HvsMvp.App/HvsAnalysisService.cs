@@ -1,4 +1,4 @@
-﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -121,7 +121,7 @@ namespace HvsMvp.App
                             lbl.V = V;
 
                             bool looksGold = DetectGoldPixel(R, G, B, H, S, V);
-                            bool looksPgm  = DetectPgmPixel(R, G, B, H, S, V);
+                            bool looksPgm = DetectPgmPixel(R, G, B, H, S, V);
 
                             if (looksGold)
                             {
@@ -152,10 +152,10 @@ namespace HvsMvp.App
                         lock (locker)
                         {
                             diagTotal += acc.Total;
-                            diagClip  += acc.Clip;
-                            gradSum   += acc.GradSum;
-                            auCount   += acc.Au;
-                            ptCount   += acc.Pt;
+                            diagClip += acc.Clip;
+                            gradSum += acc.GradSum;
+                            auCount += acc.Au;
+                            ptCount += acc.Pt;
                             otherMetal += acc.Other;
                         }
                     });
@@ -165,18 +165,85 @@ namespace HvsMvp.App
                 src24.UnlockBits(data);
             }
 
-            double focus = 0;
+            // -----------------------------
+            // BLOCO 1 – CHECKLIST DE QUALIDADE
+            // -----------------------------
+
+            // Foco bruto (0..1) já calculado a partir de gradientes
+            double focusRaw = 0;
             if (sampleCount > 0)
             {
-                focus = gradSum / sampleCount / (255.0 * 255.0);
-                focus = Math.Min(1.0, focus);
+                focusRaw = gradSum / sampleCount / (255.0 * 255.0);
+                focusRaw = Math.Min(1.0, Math.Max(0.0, focusRaw));
             }
+
+            // Converter foco para escala 0–100
+            double focusScore = focusRaw * 100.0;
+
+            // SaturationClippingFraction: fração de pixels muito escuros ou muito claros
+            double clippingFrac = diagTotal > 0 ? (double)diagClip / diagTotal : 0.0;
+
+            // Regra simples para exposição (quanto menos clipping, melhor)
+            // clipping 0   -> 100 pontos
+            // clipping 5%  -> ~75 pontos
+            // clipping 10% -> ~50 pontos
+            double exposureScore = 100.0 * (1.0 - Math.Min(1.0, clippingFrac / 0.2));
+
+            // Máscara: fração de pixels marcados como amostra
+            double foregroundFraction = (double)sampleCount / Math.Max(1, w * h);
+
+            double maskScore;
+            if (foregroundFraction < 0.3)
+            {
+                // Muito pouca amostra
+                maskScore = 50.0 * foregroundFraction / 0.3; // sobe até 50
+            }
+            else if (foregroundFraction > 0.95)
+            {
+                // Quase a imagem inteira virou amostra (suspeito)
+                maskScore = 60.0;
+            }
+            else
+            {
+                // Faixa considerada boa
+                maskScore = 80.0 + 20.0 * (1.0 - Math.Abs(foregroundFraction - 0.6) / 0.3);
+                maskScore = Math.Min(100.0, Math.Max(0.0, maskScore));
+            }
+
+            // Índice global de qualidade (0–100)
+            double qualityIndex =
+                0.4 * focusScore +
+                0.3 * exposureScore +
+                0.3 * maskScore;
+
+            // Normalizar para 0–100
+            qualityIndex = Math.Max(0.0, Math.Min(100.0, qualityIndex));
+
+            // Status do laudo
+            string qualityStatus;
+            if (qualityIndex >= 85.0)
+                qualityStatus = "Official";
+            else if (qualityIndex >= 70.0)
+                qualityStatus = "Preliminary";
+            else
+                qualityStatus = "Invalid";
+
+            // -----------------------------
+            // DIAGNÓSTICOS E RESULTADO
+            // -----------------------------
 
             var diag = new ImageDiagnosticsResult
             {
-                FocusScore = focus,
+                FocusScore = focusRaw,
                 SaturationClippingFraction = diagTotal > 0 ? (double)diagClip / diagTotal : 0,
-                ForegroundFraction = (double)sampleCount / Math.Max(1, w * h)
+                ForegroundFraction = (double)sampleCount / Math.Max(1, w * h),
+
+                // NOVOS CAMPOS (se quiser expor no objeto de diagnóstico também)
+                FocusScorePercent = focusScore,
+                ExposureScore = exposureScore,
+                MaskScore = maskScore,
+                QualityIndex = qualityIndex,
+                QualityStatus = qualityStatus
             };
 
             var result = new SampleFullAnalysisResult
@@ -184,7 +251,11 @@ namespace HvsMvp.App
                 Id = Guid.NewGuid(),
                 ImagePath = imagePath,
                 CaptureDateTimeUtc = DateTime.UtcNow,
-                Diagnostics = diag
+                Diagnostics = diag,
+
+                // Campo de qualidade direto no resultado resumido
+                QualityIndex = qualityIndex,
+                QualityStatus = qualityStatus
             };
 
             long denom = Math.Max(1, sampleCount);
@@ -280,6 +351,8 @@ namespace HvsMvp.App
                 var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
                 sb.AppendLine($" - {m.Name} ({m.Id}): {m.PctSample:P3} · {ppm} · score={m.Score:F2}");
             }
+            sb.AppendLine();
+            sb.AppendLine($"QualityIndex: {r.QualityIndex:F1} · Status: {r.QualityStatus}");
             return sb.ToString();
         }
 
