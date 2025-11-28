@@ -96,7 +96,7 @@ namespace HvsMvp.App
                 {
                     // Clean phone number (remove spaces, dashes, etc.)
                     string cleanPhone = contact.Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "");
-                    if (cleanPhone.StartsWith("+") || char.IsDigit(cleanPhone[0]))
+                    if (cleanPhone.Length > 0 && (cleanPhone.StartsWith("+") || char.IsDigit(cleanPhone[0])))
                     {
                         url = $"{WhatsAppWebUrl}?phone={cleanPhone}&text={encodedMessage}";
                     }

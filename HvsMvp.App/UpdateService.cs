@@ -80,11 +80,11 @@ namespace HvsMvp.App
                     }
                 }
 
-                return (false, null, "Unable to parse release information");
+                return (false, null, "Não foi possível interpretar informações da versão");
             }
             catch (TaskCanceledException)
             {
-                return (false, null, "Timeout ao conectar com GitHub");
+                return (false, null, "Tempo esgotado ao conectar com GitHub");
             }
             catch (HttpRequestException ex)
             {

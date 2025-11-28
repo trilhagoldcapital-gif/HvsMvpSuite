@@ -1510,6 +1510,43 @@ namespace HvsMvp.App
             AppendLog("Ferramenta de escala (placeholder).");
         }
 
+        /// <summary>
+        /// Generate a text report with version and lab information.
+        /// </summary>
+        private string BuildFullTextReport()
+        {
+            if (_lastScene?.Summary == null)
+                return string.Empty;
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Versão do MicroLab: v{UpdateService.GetCurrentVersion()}");
+            sb.AppendLine($"Laboratório: {_appSettings.LabName}");
+            if (!string.IsNullOrWhiteSpace(_appSettings.DefaultOperator))
+                sb.AppendLine($"Operador: {_appSettings.DefaultOperator}");
+            sb.AppendLine();
+            sb.Append(_lastScene.Summary.ShortReport);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Export text report to file and return the path.
+        /// </summary>
+        private string? ExportTextReport(string filePrefix = "analysis")
+        {
+            if (_lastScene?.Summary == null)
+                return null;
+
+            string dir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
+                ? _appSettings.ReportsDirectory
+                : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+            Directory.CreateDirectory(dir);
+
+            string path = Path.Combine(dir, $"{filePrefix}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt");
+            File.WriteAllText(path, BuildFullTextReport(), Encoding.UTF8);
+            _lastExportedReportPath = path;
+            return path;
+        }
+
         private void BtnTxt_Click(object? sender, EventArgs e)
         {
             if (_lastScene?.Summary == null)
@@ -1520,25 +1557,11 @@ namespace HvsMvp.App
 
             try
             {
-                string dir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
-                    ? _appSettings.ReportsDirectory
-                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
-                Directory.CreateDirectory(dir);
-
-                string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".txt");
-
-                // Build report with version and lab info
-                var sb = new StringBuilder();
-                sb.AppendLine($"Versão do MicroLab: v{UpdateService.GetCurrentVersion()}");
-                sb.AppendLine($"Laboratório: {_appSettings.LabName}");
-                if (!string.IsNullOrWhiteSpace(_appSettings.DefaultOperator))
-                    sb.AppendLine($"Operador: {_appSettings.DefaultOperator}");
-                sb.AppendLine();
-                sb.Append(_lastScene.Summary.ShortReport);
-
-                File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-                _lastExportedReportPath = path;
-                AppendLog("Exportado TXT: " + path);
+                var path = ExportTextReport("analysis");
+                if (path != null)
+                {
+                    AppendLog("Exportado TXT: " + path);
+                }
             }
             catch (Exception ex)
             {
@@ -2060,26 +2083,14 @@ namespace HvsMvp.App
                 // If there's no exported report, export one first
                 if (string.IsNullOrWhiteSpace(_lastExportedReportPath) || !File.Exists(_lastExportedReportPath))
                 {
-                    // Auto-export TXT
-                    string dir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
-                        ? _appSettings.ReportsDirectory
-                        : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
-                    Directory.CreateDirectory(dir);
-
-                    string path = Path.Combine(dir, "laudo_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".txt");
-
-                    // Build report with version info
-                    var reportText = $"Versão do MicroLab: v{UpdateService.GetCurrentVersion()}\n" +
-                                     $"Laboratório: {_appSettings.LabName}\n" +
-                                     $"Operador: {_appSettings.DefaultOperator}\n\n" +
-                                     _lastScene.Summary.ShortReport;
-
-                    File.WriteAllText(path, reportText, Encoding.UTF8);
-                    _lastExportedReportPath = path;
-                    AppendLog($"Laudo exportado automaticamente: {path}");
+                    var path = ExportTextReport("laudo");
+                    if (path != null)
+                    {
+                        AppendLog($"Laudo exportado automaticamente: {path}");
+                    }
                 }
 
-                WhatsAppService.ShareReport(sampleName, _lastExportedReportPath, _appSettings);
+                WhatsAppService.ShareReport(sampleName, _lastExportedReportPath ?? "", _appSettings);
                 AppendLog("WhatsApp Web aberto. Arraste o arquivo do laudo para a conversa.");
             }
             catch (Exception ex)

@@ -250,9 +250,16 @@ namespace HvsMvp.App
         {
             Task.Delay(milliseconds).ContinueWith(_ =>
             {
-                if (!IsDisposed && Visible)
+                try
                 {
-                    Invoke(new Action(CloseSplash));
+                    if (!IsDisposed && Visible && IsHandleCreated)
+                    {
+                        BeginInvoke(new Action(CloseSplash));
+                    }
+                }
+                catch
+                {
+                    // Ignore errors during shutdown
                 }
             });
         }
