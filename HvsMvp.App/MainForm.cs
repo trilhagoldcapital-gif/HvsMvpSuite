@@ -1021,28 +1021,33 @@ namespace HvsMvp.App
             {
                 if (_analysisService == null || _config == null)
                 {
-                    AppendLog("Serviço de análise HVS não está inicializado (config ausente).");
+                    AppendLog("⚠️ Serviço de análise HVS não está inicializado (config ausente).");
                     return;
                 }
                 if (_pictureSample.Image == null)
                 {
-                    AppendLog("Nenhuma imagem disponível para análise.");
+                    AppendLog("⚠️ Nenhuma imagem disponível para análise.");
                     return;
+                }
+
+                // Verificar estado da câmera se em live mode
+                if (_liveRunning)
+                {
+                    AppendLog("📷 Capturando frame da câmera para análise...");
                 }
 
                 using var bmp = new Bitmap(_pictureSample.Image);
 
-                var summary = _analysisService.RunWithAutoReanalysis(bmp, imagePath: null);
-
-                var scene = new FullSceneAnalysis
+                // Usar AnalyzeScene para obter a cena completa com Labels
+                var scene = _analysisService.AnalyzeScene(bmp, imagePath: null);
+                
+                // Se QualityStatus for Invalid, executar reanálise automática
+                if (string.Equals(scene.Summary.QualityStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
                 {
-                    Summary = summary,
-                    Labels = _lastScene?.Labels ?? new PixelLabel[1, 1],
-                    Mask = _lastScene?.Mask ?? new SampleMaskClass[1, 1],
-                    MaskPreview = _lastScene?.MaskPreview ?? new Bitmap(1, 1),
-                    Width = _lastScene?.Width ?? bmp.Width,
-                    Height = _lastScene?.Height ?? bmp.Height
-                };
+                    AppendLog("🔄 Qualidade baixa detectada, executando reanálise automática...");
+                    var reanalyzedSummary = _analysisService.RunWithAutoReanalysis(bmp, imagePath: null);
+                    scene.Summary = reanalyzedSummary;
+                }
 
                 _lastScene = scene;
 
@@ -1052,9 +1057,14 @@ namespace HvsMvp.App
 
                 _txtDetails.Text = scene.Summary.ShortReport;
                 UpdateMaterialListsFromScene();
-                AppendLog("Análise HVS completa concluída (com reanálise automática se necessário).");
-
+                
                 var s = scene.Summary;
+                string materiaisEncontrados = s.Metals.Count + s.Crystals.Count + s.Gems.Count > 0 
+                    ? $"✅ {s.Metals.Count} metais, {s.Crystals.Count} cristais, {s.Gems.Count} gemas" 
+                    : "⚠️ Nenhum material detectado";
+                
+                AppendLog($"Análise HVS completa: {materiaisEncontrados}");
+
                 _lblStatus.Text =
                     $"Qualidade: {s.QualityIndex:F1} ({s.QualityStatus}) · Foco={s.Diagnostics.FocusScorePercent:F1} · Exposição={s.Diagnostics.ExposureScore:F1} · Máscara={s.Diagnostics.MaskScore:F1}";
 
@@ -1066,7 +1076,7 @@ namespace HvsMvp.App
             }
             catch (Exception ex)
             {
-                AppendLog($"Erro ao executar análise: {ex.Message}");
+                AppendLog($"❌ Erro ao executar análise: {ex.Message}");
             }
         }
 
@@ -1214,57 +1224,80 @@ namespace HvsMvp.App
 
         /// <summary>
         /// Análise seletiva coerente com Summary + LabelMap.
+        /// Funciona para imagem estática, frame de câmera e modo contínuo.
         /// </summary>
         private void BtnSelectiveAnalyze_Click(object? sender, EventArgs e)
         {
-            if (_lastScene == null)
+            try
             {
-                AppendLog("Nenhuma análise disponível para análise seletiva.");
-                return;
-            }
-            if (_cbTarget == null || _cbTarget.SelectedItem == null)
-            {
-                AppendLog("Nenhum alvo selecionado para análise seletiva.");
-                return;
-            }
-
-            string alvoTexto = _cbTarget.SelectedItem.ToString() ?? "(desconhecido)";
-            AppendLog($"Análise seletiva solicitada para: {alvoTexto}");
-
-            var summary = _lastScene.Summary;
-            var sb = new StringBuilder();
-            sb.AppendLine($"Análise seletiva – {alvoTexto}");
-            sb.AppendLine("--------------------------------");
-
-            string? targetId = null;
-            int tipoAlvo = -1;
-            double pctSample = 0;
-
-            if (alvoTexto.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
-            {
-                string name = alvoTexto.Substring("Metal:".Length).Trim();
-                var m = summary.Metals.Find(x =>
-                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
-
-                if (m != null)
+                // Verificar se há uma análise disponível
+                if (_lastScene == null)
                 {
-                    var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
-                    sb.AppendLine($"ID: {m.Id}");
-                    sb.AppendLine($"Nome: {m.Name}");
-                    sb.AppendLine($"Grupo: {m.Group}");
-                    sb.AppendLine($"Fração na amostra: {m.PctSample:P4}");
-                    sb.AppendLine($"PPM estimado: {ppm}");
-                    sb.AppendLine($"Score combinado: {m.Score:F3}");
-                    targetId = m.Id;
-                    pctSample = m.PctSample;
-                    tipoAlvo = 0;
+                    // Se estiver em live mode e tiver imagem, tenta fazer análise primeiro
+                    if (_pictureSample.Image != null && _analysisService != null)
+                    {
+                        AppendLog("Executando análise antes da análise seletiva...");
+                        using var bmp = new Bitmap(_pictureSample.Image);
+                        var scene = _analysisService.AnalyzeScene(bmp, null);
+                        _lastScene = scene;
+                        _lastBaseImageClone?.Dispose();
+                        _lastBaseImageClone = (Bitmap)bmp.Clone();
+                    }
+                    else
+                    {
+                        AppendLog("⚠️ Nenhuma análise disponível para análise seletiva. Execute uma análise primeiro.");
+                        return;
+                    }
                 }
-                else
+                
+                if (_cbTarget == null || _cbTarget.SelectedItem == null)
                 {
-                    sb.AppendLine("Nenhum resultado para esse metal na última análise.");
+                    AppendLog("⚠️ Nenhum alvo selecionado para análise seletiva. Selecione um alvo no combo 'Alvo'.");
+                    return;
                 }
-            }
+
+                string alvoTexto = _cbTarget.SelectedItem.ToString() ?? "(desconhecido)";
+                AppendLog($"🎯 Análise seletiva para: {alvoTexto}");
+
+                var summary = _lastScene.Summary;
+                var sb = new StringBuilder();
+                sb.AppendLine($"🎯 Análise seletiva – {alvoTexto}");
+                sb.AppendLine("--------------------------------");
+
+                string? targetId = null;
+                int tipoAlvo = -1;
+                double pctSample = 0;
+
+                if (alvoTexto.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
+                {
+                    string name = alvoTexto.Substring("Metal:".Length).Trim();
+                    var m = summary.Metals.Find(x =>
+                        string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
+
+                    if (m != null)
+                    {
+                        var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
+                        sb.AppendLine($"ID: {m.Id}");
+                        sb.AppendLine($"Nome: {m.Name}");
+                        sb.AppendLine($"Grupo: {m.Group}");
+                        sb.AppendLine($"Fração na amostra: {m.PctSample:P4}");
+                        sb.AppendLine($"PPM estimado: {ppm}");
+                        sb.AppendLine($"Score combinado: {m.Score:F3}");
+                        targetId = m.Id;
+                        pctSample = m.PctSample;
+                        tipoAlvo = 0;
+                    }
+                    else
+                    {
+                        sb.AppendLine("⚠️ Metal não encontrado na última análise.");
+                        sb.AppendLine("Metais disponíveis:");
+                        foreach (var metal in summary.Metals.Take(5))
+                        {
+                            sb.AppendLine($"  - {metal.Name} ({metal.Id}): {metal.PctSample:P3}");
+                        }
+                    }
+                }
             else if (alvoTexto.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
             {
                 string name = alvoTexto.Substring("Cristal:".Length).Trim();
@@ -1283,7 +1316,7 @@ namespace HvsMvp.App
                 }
                 else
                 {
-                    sb.AppendLine("Nenhum resultado para esse cristal na última análise.");
+                    sb.AppendLine("⚠️ Cristal não encontrado na última análise.");
                 }
             }
             else if (alvoTexto.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
@@ -1304,7 +1337,7 @@ namespace HvsMvp.App
                 }
                 else
                 {
-                    sb.AppendLine("Nenhum resultado para essa gema na última análise.");
+                    sb.AppendLine("⚠️ Gema não encontrada na última análise.");
                 }
             }
 
@@ -1312,13 +1345,13 @@ namespace HvsMvp.App
 
             if (string.IsNullOrWhiteSpace(targetId))
             {
-                AppendLog("Nenhum ID de alvo encontrado no resumo. Nada para pintar.");
+                AppendLog("⚠️ Nenhum ID de alvo encontrado no resumo. Nada para destacar.");
                 return;
             }
 
             if (pctSample <= 0)
             {
-                AppendLog($"Fração da amostra para '{alvoTexto}' é 0%. Nenhum pixel será destacado.");
+                AppendLog($"ℹ️ Fração da amostra para '{alvoTexto}' é 0%. Nenhum pixel será destacado.");
                 if (_lastBaseImageClone != null)
                 {
                     _pictureSample.Image?.Dispose();
@@ -1333,10 +1366,11 @@ namespace HvsMvp.App
 
             if (_lastBaseImageClone == null)
             {
-                AppendLog("Imagem base ausente para máscara seletiva.");
+                AppendLog("⚠️ Imagem base ausente para máscara seletiva.");
                 return;
             }
 
+            // Gerar e aplicar máscara seletiva
             using var baseImg = new Bitmap(_lastBaseImageClone);
             var selective = BuildSelectiveMaskFromLabels(baseImg, _lastScene, targetId, tipoAlvo);
 
@@ -1348,66 +1382,97 @@ namespace HvsMvp.App
                 _showMask = _showMaskedBackground = false;
                 _zoomFactor = 1.0f;
                 ApplyZoom();
-                AppendLog("Máscara seletiva visual aplicada ao alvo (via LabelMap).");
+                AppendLog($"✅ Máscara seletiva aplicada para '{targetId}' ({pctSample:P2} da amostra).");
             }
             else
             {
-                AppendLog("Falha ao gerar máscara seletiva a partir dos rótulos.");
+                AppendLog("❌ Falha ao gerar máscara seletiva a partir dos rótulos.");
+            }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"❌ Erro na análise seletiva: {ex.Message}");
             }
         }
 
         private Bitmap? BuildSelectiveMaskFromLabels(Bitmap baseImage, FullSceneAnalysis scene, string targetId, int tipoAlvo)
         {
-            if (scene.Labels == null) return null;
-            int w = scene.Width;
-            int h = scene.Height;
-            if (w <= 0 || h <= 0) return null;
-            if (baseImage.Width != w || baseImage.Height != h) return null;
-
-            const double CONF_THRESHOLD = 0.6;
-
-            Color overlayColor =
-                tipoAlvo == 0 ? Color.FromArgb(255, 255, 220, 0) :
-                tipoAlvo == 1 ? Color.FromArgb(255, 0, 255, 0) :
-                                 Color.FromArgb(255, 255, 0, 255);
-
-            var result = new Bitmap(w, h);
-            for (int y = 0; y < h; y++)
+            try
             {
-                for (int x = 0; x < w; x++)
+                if (scene.Labels == null) return null;
+                int w = scene.Width;
+                int h = scene.Height;
+                if (w <= 0 || h <= 0) return null;
+                
+                // Handle size mismatch by using min dimensions
+                int actualW = Math.Min(baseImage.Width, w);
+                int actualH = Math.Min(baseImage.Height, h);
+                
+                if (actualW <= 0 || actualH <= 0) return null;
+
+                const double CONF_THRESHOLD = 0.5; // Reduced threshold for better visibility
+
+                Color overlayColor =
+                    tipoAlvo == 0 ? Color.FromArgb(255, 255, 220, 0) :
+                    tipoAlvo == 1 ? Color.FromArgb(255, 0, 255, 0) :
+                                     Color.FromArgb(255, 255, 0, 255);
+
+                var result = new Bitmap(actualW, actualH);
+                int matchCount = 0;
+                
+                for (int y = 0; y < actualH; y++)
                 {
-                    var src = baseImage.GetPixel(x, y);
-                    var lbl = scene.Labels[x, y] ?? new PixelLabel { IsSample = false, MaterialType = PixelMaterialType.Background };
+                    for (int x = 0; x < actualW; x++)
+                    {
+                        var src = baseImage.GetPixel(x, y);
+                        
+                        // Safe access to labels array
+                        PixelLabel? lbl = null;
+                        if (x < scene.Labels.GetLength(0) && y < scene.Labels.GetLength(1))
+                        {
+                            lbl = scene.Labels[x, y];
+                        }
+                        
+                        if (lbl == null)
+                        {
+                            lbl = new PixelLabel { IsSample = false, MaterialType = PixelMaterialType.Background };
+                        }
 
-                    if (!lbl.IsSample)
-                    {
-                        Color bg = Color.FromArgb(0, 80, 200);
-                        double aBg = 0.6;
-                        int rBg = (int)(src.R * (1 - aBg) + bg.R * aBg);
-                        int gBg = (int)(src.G * (1 - aBg) + bg.G * aBg);
-                        int bBg = (int)(src.B * (1 - aBg) + bg.B * aBg);
-                        result.SetPixel(x, y, Color.FromArgb(rBg, gBg, bBg));
-                        continue;
-                    }
+                        if (!lbl.IsSample)
+                        {
+                            Color bg = Color.FromArgb(0, 80, 200);
+                            double aBg = 0.6;
+                            int rBg = (int)(src.R * (1 - aBg) + bg.R * aBg);
+                            int gBg = (int)(src.G * (1 - aBg) + bg.G * aBg);
+                            int bBg = (int)(src.B * (1 - aBg) + bg.B * aBg);
+                            result.SetPixel(x, y, Color.FromArgb(rBg, gBg, bBg));
+                            continue;
+                        }
 
-                    if (!string.IsNullOrWhiteSpace(lbl.MaterialId) &&
-                        string.Equals(lbl.MaterialId, targetId, StringComparison.OrdinalIgnoreCase) &&
-                        lbl.MaterialConfidence >= CONF_THRESHOLD)
-                    {
-                        double a = 0.6;
-                        int r = (int)(src.R * (1 - a) + overlayColor.R * a);
-                        int g = (int)(src.G * (1 - a) + overlayColor.G * a);
-                        int b = (int)(src.B * (1 - a) + overlayColor.B * a);
-                        result.SetPixel(x, y, Color.FromArgb(r, g, b));
-                    }
-                    else
-                    {
-                        result.SetPixel(x, y, src);
+                        if (!string.IsNullOrWhiteSpace(lbl.MaterialId) &&
+                            string.Equals(lbl.MaterialId, targetId, StringComparison.OrdinalIgnoreCase) &&
+                            lbl.MaterialConfidence >= CONF_THRESHOLD)
+                        {
+                            double a = 0.6;
+                            int r = (int)(src.R * (1 - a) + overlayColor.R * a);
+                            int g = (int)(src.G * (1 - a) + overlayColor.G * a);
+                            int b = (int)(src.B * (1 - a) + overlayColor.B * a);
+                            result.SetPixel(x, y, Color.FromArgb(r, g, b));
+                            matchCount++;
+                        }
+                        else
+                        {
+                            result.SetPixel(x, y, src);
+                        }
                     }
                 }
-            }
 
-            return result;
+                return result;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         private void BtnMascara_Click(object? sender, EventArgs e)
