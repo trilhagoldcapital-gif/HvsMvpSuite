@@ -218,10 +218,10 @@ namespace HvsMvp.App
                 Opacity = _opacity;
             }
 
-            // Progress bar animation - fills over approximately 10 seconds
+            // Progress bar animation - fills gradually (splash closes at 10s via timer)
             if (!_fadingOut && _progressValue < 400)
             {
-                _progressValue += 1;  // Changed from 8 to 1 for slower fill over ~12s
+                _progressValue += 1;  // Slow fill; splash closes before bar is full for smooth exit
                 if (_progressValue > 400) _progressValue = 400;
                 _progressBar.Width = _progressValue;
 

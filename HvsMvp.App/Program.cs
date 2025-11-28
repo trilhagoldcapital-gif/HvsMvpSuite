@@ -39,8 +39,8 @@ namespace HvsMvp.App
                 try
                 {
                     // Calculate remaining time to keep splash visible
-                    var elapsed = (DateTime.UtcNow - splashStartTime).TotalMilliseconds;
-                    var remainingMs = SplashDisplayTimeMs - (int)elapsed;
+                    var elapsedMs = (long)(DateTime.UtcNow - splashStartTime).TotalMilliseconds;
+                    var remainingMs = (int)Math.Max(0, SplashDisplayTimeMs - elapsedMs);
 
                     if (remainingMs > 0)
                     {
