@@ -26,7 +26,6 @@ namespace HvsMvp.App
 
         /// <summary>
         /// BLOCO 2 – Executa análise com reanálise automática para amostras críticas.
-        /// Regra inicial:
         /// - Se QualityStatus == "Invalid", roda mais 2 análises na mesma imagem.
         /// - Compara QualityIndex e %Au nas 3 rodadas.
         /// - Se convergir: QualityStatus = "OfficialRechecked".
@@ -78,13 +77,9 @@ namespace HvsMvp.App
             bool convergiu = (qRange <= 5.0) && (aRange <= 0.0005);
 
             if (convergiu)
-            {
                 r1.QualityStatus = "OfficialRechecked";
-            }
             else
-            {
                 r1.QualityStatus = "ReviewRequired";
-            }
 
             // Monta um pequeno resumo da reanálise para anexo ao ShortReport
             var sb = new StringBuilder();
@@ -245,7 +240,6 @@ namespace HvsMvp.App
             // BLOCO 1 – CHECKLIST DE QUALIDADE
             // -----------------------------
 
-            // Foco bruto (0..1) já calculado a partir de gradientes
             double focusRaw = 0;
             if (sampleCount > 0)
             {
@@ -253,49 +247,36 @@ namespace HvsMvp.App
                 focusRaw = Math.Min(1.0, Math.Max(0.0, focusRaw));
             }
 
-            // Converter foco para escala 0–100
             double focusScore = focusRaw * 100.0;
 
-            // SaturationClippingFraction: fração de pixels muito escuros ou muito claros
             double clippingFrac = diagTotal > 0 ? (double)diagClip / diagTotal : 0.0;
 
-            // Regra simples para exposição (quanto menos clipping, melhor)
-            // clipping 0   -> 100 pontos
-            // clipping 5%  -> ~75 pontos
-            // clipping 10% -> ~50 pontos
             double exposureScore = 100.0 * (1.0 - Math.Min(1.0, clippingFrac / 0.2));
 
-            // Máscara: fração de pixels marcados como amostra
             double foregroundFraction = (double)sampleCount / Math.Max(1, w * h);
 
             double maskScore;
             if (foregroundFraction < 0.3)
             {
-                // Muito pouca amostra
-                maskScore = 50.0 * foregroundFraction / 0.3; // sobe até 50
+                maskScore = 50.0 * foregroundFraction / 0.3;
             }
             else if (foregroundFraction > 0.95)
             {
-                // Quase a imagem inteira virou amostra (suspeito)
                 maskScore = 60.0;
             }
             else
             {
-                // Faixa considerada boa
                 maskScore = 80.0 + 20.0 * (1.0 - Math.Abs(foregroundFraction - 0.6) / 0.3);
                 maskScore = Math.Min(100.0, Math.Max(0.0, maskScore));
             }
 
-            // Índice global de qualidade (0–100)
             double qualityIndex =
                 0.4 * focusScore +
                 0.3 * exposureScore +
                 0.3 * maskScore;
 
-            // Normalizar para 0–100
             qualityIndex = Math.Max(0.0, Math.Min(100.0, qualityIndex));
 
-            // Status do laudo
             string qualityStatus;
             if (qualityIndex >= 85.0)
                 qualityStatus = "Official";
@@ -355,6 +336,85 @@ namespace HvsMvp.App
                 PpmEstimated = pctPt > 0 ? pctPt * 1_000_000.0 : (double?)null,
                 Score = Math.Min(1.0, 0.6 + pctPt * 10.0)
             });
+
+            // -----------------------------
+            // BLOCO 3A – BANCO BÁSICO DE PARTÍCULAS
+            // -----------------------------
+            // Aqui vamos criar "partículas agregadas por material" (agrupamento bem simples).
+            // Para uma primeira versão:
+            // - Criamos uma partícula agregada para Au (se houver) e outra para Pt (se houver),
+            //   usando a contagem total de pixels e uma posição média aproximada.
+
+            var particles = new List<ParticleRecord>();
+
+            if (sampleCount > 0)
+            {
+                // Acumular centro de massa aproximado para Au e Pt
+                long auPx = 0, ptPx = 0;
+                long auSumX = 0, auSumY = 0;
+                long ptSumX = 0, ptSumY = 0;
+
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        var lbl = labels[x, y];
+                        if (lbl == null || !lbl.IsSample || lbl.MaterialType != PixelMaterialType.Metal)
+                            continue;
+
+                        if (string.Equals(lbl.MaterialId, "Au", StringComparison.OrdinalIgnoreCase))
+                        {
+                            auPx++;
+                            auSumX += x;
+                            auSumY += y;
+                        }
+                        else if (string.Equals(lbl.MaterialId, "Pt", StringComparison.OrdinalIgnoreCase))
+                        {
+                            ptPx++;
+                            ptSumX += x;
+                            ptSumY += y;
+                        }
+                    }
+                }
+
+                if (auPx > 0)
+                {
+                    int cx = (int)(auSumX / auPx);
+                    int cy = (int)(auSumY / auPx);
+
+                    double conf = 0.95; // mesma lógica da detecção de pixel de Au
+
+                    particles.Add(new ParticleRecord
+                    {
+                        AnalysisId = result.Id,
+                        MaterialId = "Au",
+                        Confidence = conf,
+                        ApproxAreaPixels = (int)auPx,
+                        CenterX = cx,
+                        CenterY = cy
+                    });
+                }
+
+                if (ptPx > 0)
+                {
+                    int cx = (int)(ptSumX / ptPx);
+                    int cy = (int)(ptSumY / ptPx);
+
+                    double conf = 0.80; // mesma lógica da detecção de pixel de Pt
+
+                    particles.Add(new ParticleRecord
+                    {
+                        AnalysisId = result.Id,
+                        MaterialId = "Pt",
+                        Confidence = conf,
+                        ApproxAreaPixels = (int)ptPx,
+                        CenterX = cx,
+                        CenterY = cy
+                    });
+                }
+            }
+
+            result.Particles.AddRange(particles);
 
             result.ShortReport = BuildShortReport(result);
 
@@ -426,6 +486,7 @@ namespace HvsMvp.App
             }
             sb.AppendLine();
             sb.AppendLine($"QualityIndex: {r.QualityIndex:F1} · Status: {r.QualityStatus}");
+            sb.AppendLine($"Partículas (agregadas): {r.Particles.Count}");
             return sb.ToString();
         }
 
