@@ -73,10 +73,12 @@ namespace HvsMvp.App
         private Button _btnCameraSel = null!;
         private Button _btnResolucaoSel = null!;
         private Button _btnTxt = null!;
+        private Button _btnPdf = null!;      // NEW: PDF export
         private Button _btnJson = null!;
         private Button _btnCsv = null!;
         private Button _btnBiCsv = null!;
         private Button _btnExportIa = null!;   // NOVO: export dataset IA
+        private Button _btnQaPanel = null!;    // NEW: QA Panel
         private Button _btnDebugHvs = null!;
         private Button _btnCalib = null!;
         private Button _btnSettings = null!;
@@ -86,6 +88,9 @@ namespace HvsMvp.App
         // Services for new features
         private PhaseMapService _phaseMapService = new PhaseMapService();
         private TrainingModeService _trainingService = new TrainingModeService();
+        private ReportService? _reportService;
+        private BiExportService? _biExportService;
+        private IaDatasetService? _iaDatasetService;
 
         // Quality checklist panel
         private QualityChecklistPanel _qualityPanel = null!;
@@ -131,11 +136,13 @@ namespace HvsMvp.App
                     ["btn.scale"] = "📏 Escala",
                     ["btn.camera"] = "🎥 Câmera...",
                     ["btn.res"] = "⚙️ Resolução...",
-                    ["btn.txt"] = "📝 TXT",
+                    ["btn.txt"] = "📝 Laudo TXT",
+                    ["btn.pdf"] = "📄 Laudo PDF",
                     ["btn.json"] = "{} JSON",
                     ["btn.csv"] = "📊 CSV",
                     ["btn.bi.csv"] = "📈 BI CSV",
-                    ["btn.export.ia"] = "🤖 Dataset IA",  // NOVO
+                    ["btn.export.ia"] = "🤖 Dataset IA",
+                    ["btn.qa.panel"] = "✅ QA Partículas",
                     ["btn.debug"] = "🛠 Debug HVS",
                     ["btn.calib"] = "📸 Calibrar (auto)",
                     ["label.target"] = "Alvo:"
@@ -165,11 +172,13 @@ namespace HvsMvp.App
                     ["btn.scale"] = "📏 Scale",
                     ["btn.camera"] = "🎥 Camera...",
                     ["btn.res"] = "⚙️ Resolution...",
-                    ["btn.txt"] = "📝 TXT",
+                    ["btn.txt"] = "📝 TXT Report",
+                    ["btn.pdf"] = "📄 PDF Report",
                     ["btn.json"] = "{} JSON",
                     ["btn.csv"] = "📊 CSV",
                     ["btn.bi.csv"] = "📈 BI CSV",
                     ["btn.export.ia"] = "🤖 IA Dataset",
+                    ["btn.qa.panel"] = "✅ QA Particles",
                     ["btn.debug"] = "🛠 HVS Debug",
                     ["btn.calib"] = "📸 Calibrate (auto)",
                     ["label.target"] = "Target:"
@@ -201,6 +210,11 @@ namespace HvsMvp.App
 
             // Load app settings
             _appSettings = AppSettings.Load();
+
+            // Initialize production services
+            _reportService = new ReportService(_appSettings);
+            _biExportService = new BiExportService(_appSettings);
+            _iaDatasetService = new IaDatasetService(_appSettings);
 
             // Apply settings to camera
             _cameraIndex = _appSettings.DefaultCameraIndex;
@@ -490,6 +504,10 @@ namespace HvsMvp.App
             _btnTxt.Click += BtnTxt_Click;
             _toolbarRow2.Controls.Add(_btnTxt);
 
+            _btnPdf = Cmd("");
+            _btnPdf.Click += BtnPdf_Click;
+            _toolbarRow2.Controls.Add(_btnPdf);
+
             _btnJson = Cmd("");
             _btnJson.Click += BtnJson_Click;
             _toolbarRow2.Controls.Add(_btnJson);
@@ -506,6 +524,11 @@ namespace HvsMvp.App
             _btnExportIa = Cmd("");
             _btnExportIa.Click += BtnExportIa_Click;
             _toolbarRow2.Controls.Add(_btnExportIa);
+
+            // NOVO: botão QA Panel
+            _btnQaPanel = Cmd("");
+            _btnQaPanel.Click += BtnQaPanel_Click;
+            _toolbarRow2.Controls.Add(_btnQaPanel);
 
             _btnDebugHvs = Cmd("");
             _btnDebugHvs.Click += BtnDebugHvs_Click;
@@ -782,10 +805,12 @@ namespace HvsMvp.App
             _btnCameraSel.Text = t["btn.camera"];
             _btnResolucaoSel.Text = t["btn.res"];
             _btnTxt.Text = t["btn.txt"];
+            _btnPdf.Text = t["btn.pdf"];
             _btnJson.Text = t["btn.json"];
             _btnCsv.Text = t["btn.csv"];
             _btnBiCsv.Text = t["btn.bi.csv"];
-            _btnExportIa.Text = _i18n[_currentLocale]["btn.export.ia"];
+            _btnExportIa.Text = t["btn.export.ia"];
+            _btnQaPanel.Text = t["btn.qa.panel"];
             _btnDebugHvs.Text = t["btn.debug"];
             _btnCalib.Text = t["btn.calib"];
             _btnLanguage.Text = $"Idioma ({_currentLocale}) ▾";
@@ -1080,7 +1105,7 @@ namespace HvsMvp.App
             }
         }
 
-        // Export BI CSV
+        // Export BI CSV - Using new BiExportService
         private void BtnBiCsv_Click(object? sender, EventArgs e)
         {
             if (_lastScene?.Summary == null)
@@ -1091,49 +1116,23 @@ namespace HvsMvp.App
 
             try
             {
-                var s = _lastScene.Summary;
-
-                double pctAu = 0, pctPt = 0, pctOther = 0;
-                foreach (var m in s.Metals)
+                if (_biExportService == null)
                 {
-                    if (string.Equals(m.Id, "Au", StringComparison.OrdinalIgnoreCase))
-                        pctAu = m.PctSample;
-                    else if (string.Equals(m.Id, "Pt", StringComparison.OrdinalIgnoreCase))
-                        pctPt = m.PctSample;
-                    else if (string.Equals(m.Id, "MetalOther", StringComparison.OrdinalIgnoreCase))
-                        pctOther = m.PctSample;
+                    _biExportService = new BiExportService(_appSettings);
                 }
 
-                int particleCount = s.Particles?.Count ?? 0;
+                string sampleName = _appSettings.DefaultSampleName;
+                string clientProject = _appSettings.DefaultClientProject;
+                string captureMode = _liveRunning ? "Live" : (_continuousRunning ? "Continuous" : "Image");
 
-                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
-                Directory.CreateDirectory(dir);
+                var path = _biExportService.ExportToBiCsv(
+                    _lastScene.Summary,
+                    sampleName,
+                    clientProject,
+                    captureMode,
+                    null);
 
-                string day = DateTime.UtcNow.ToString("yyyyMMdd");
-                string path = Path.Combine(dir, $"bi_{day}.csv");
-
-                bool fileExists = File.Exists(path);
-
-                var sb = new StringBuilder();
-                if (!fileExists)
-                {
-                    sb.AppendLine("AnalysisId,DateUtc,QualityIndex,QualityStatus,PctAu,PctPt,PctMetalOther,ParticlesCount");
-                }
-
-                string line =
-                    $"{s.Id}," +
-                    $"{s.CaptureDateTimeUtc:O}," +
-                    $"{s.QualityIndex:F2}," +
-                    $"{s.QualityStatus}," +
-                    $"{pctAu:F6}," +
-                    $"{pctPt:F6}," +
-                    $"{pctOther:F6}," +
-                    $"{particleCount}";
-
-                sb.AppendLine(line);
-
-                File.AppendAllText(path, sb.ToString(), Encoding.UTF8);
-                AppendLog("Linha BI CSV exportada para: " + path);
+                AppendLog($"BI CSV consolidado exportado: {path}");
             }
             catch (Exception ex)
             {
@@ -1141,7 +1140,7 @@ namespace HvsMvp.App
             }
         }
 
-        // 3C – Export dataset IA por partícula
+        // Export dataset IA por partícula - Using new IaDatasetService
         private void BtnExportIa_Click(object? sender, EventArgs e)
         {
             try
@@ -1153,68 +1152,43 @@ namespace HvsMvp.App
                 }
 
                 var s = _lastScene.Summary;
-                var img = _lastBaseImageClone;
                 if (s.Particles == null || s.Particles.Count == 0)
                 {
                     AppendLog("Nenhuma partícula registrada para exportar dataset IA.");
                     return;
                 }
 
-                string baseDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "datasets", "ia-particles");
-                Directory.CreateDirectory(baseDir);
-
-                int exported = 0;
-                const int CROP_SIZE = 64; // recorte 64x64 em torno da partícula
-
-                foreach (var p in s.Particles)
+                if (_iaDatasetService == null)
                 {
-                    string material = string.IsNullOrWhiteSpace(p.MaterialId) ? "Unknown" : p.MaterialId;
-                    string matDir = Path.Combine(baseDir, material);
-                    Directory.CreateDirectory(matDir);
-
-                    // Coordenadas do recorte
-                    int half = CROP_SIZE / 2;
-                    int x1 = Math.Max(0, p.CenterX - half);
-                    int y1 = Math.Max(0, p.CenterY - half);
-                    int x2 = Math.Min(img.Width, p.CenterX + half);
-                    int y2 = Math.Min(img.Height, p.CenterY + half);
-
-                    int w = x2 - x1;
-                    int h = y2 - y1;
-                    if (w <= 4 || h <= 4) continue; // muito pequeno, ignora
-
-                    using (var crop = new Bitmap(w, h))
-                    using (var g = Graphics.FromImage(crop))
-                    {
-                        g.DrawImage(img, new Rectangle(0, 0, w, h), new Rectangle(x1, y1, w, h), GraphicsUnit.Pixel);
-
-                        string ts = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss_fff");
-                        string fileBase = $"particle_{s.Id}_{p.ParticleId}_{ts}";
-                        string imgPath = Path.Combine(matDir, fileBase + ".png");
-                        string jsonPath = Path.Combine(matDir, fileBase + ".json");
-
-                        crop.Save(imgPath, System.Drawing.Imaging.ImageFormat.Png);
-
-                        var meta = new
-                        {
-                            analysisId = s.Id,
-                            particleId = p.ParticleId,
-                            materialId = p.MaterialId,
-                            confidence = p.Confidence,
-                            centerX = p.CenterX,
-                            centerY = p.CenterY,
-                            approxAreaPixels = p.ApproxAreaPixels,
-                            imageRelativePath = Path.GetRelativePath(baseDir, imgPath)
-                        };
-
-                        var json = JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true });
-                        File.WriteAllText(jsonPath, json, Encoding.UTF8);
-
-                        exported++;
-                    }
+                    _iaDatasetService = new IaDatasetService(_appSettings);
                 }
 
-                AppendLog($"Export dataset IA: {exported} partículas exportadas em {baseDir}");
+                var result = _iaDatasetService.ExportDataset(
+                    _lastScene,
+                    _lastBaseImageClone,
+                    _appSettings.DefaultOperator);
+
+                if (result.Success)
+                {
+                    AppendLog($"✅ Dataset IA exportado: {result.ExportedCount} partículas em {result.OutputDirectory}");
+                    AppendLog($"   Índice CSV: {result.CsvIndexPath}");
+                    if (result.SkippedCount > 0)
+                    {
+                        AppendLog($"   ⚠️ {result.SkippedCount} partículas ignoradas (muito pequenas)");
+                    }
+                }
+                else
+                {
+                    AppendLog($"❌ Falha ao exportar dataset IA: {result.Message}");
+                }
+
+                if (result.Errors.Count > 0)
+                {
+                    foreach (var error in result.Errors.Take(5))
+                    {
+                        AppendLog($"   Erro: {error}");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1843,15 +1817,75 @@ namespace HvsMvp.App
 
             try
             {
-                var path = ExportTextReport("analysis");
-                if (path != null)
+                if (_reportService == null)
                 {
-                    AppendLog("Exportado TXT: " + path);
+                    _reportService = new ReportService(_appSettings);
                 }
+
+                string sampleName = _appSettings.DefaultSampleName;
+                string clientProject = _appSettings.DefaultClientProject;
+
+                var path = _reportService.ExportTxtReport(_lastScene.Summary, sampleName, clientProject);
+                _lastExportedReportPath = path;
+                AppendLog("Laudo TXT exportado: " + path);
             }
             catch (Exception ex)
             {
-                AppendLog("Erro ao exportar TXT: " + ex.Message);
+                AppendLog("Erro ao exportar laudo TXT: " + ex.Message);
+            }
+        }
+
+        private void BtnPdf_Click(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null)
+            {
+                AppendLog("Nenhuma análise disponível para exportar PDF.");
+                return;
+            }
+
+            try
+            {
+                if (_reportService == null)
+                {
+                    _reportService = new ReportService(_appSettings);
+                }
+
+                string sampleName = _appSettings.DefaultSampleName;
+                string clientProject = _appSettings.DefaultClientProject;
+
+                var path = _reportService.ExportPdfReport(_lastScene.Summary, sampleName, clientProject);
+                _lastExportedReportPath = path;
+                AppendLog("Laudo PDF exportado: " + path);
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro ao exportar laudo PDF: " + ex.Message);
+            }
+        }
+
+        private void BtnQaPanel_Click(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null || _lastBaseImageClone == null)
+            {
+                AppendLog("Nenhuma análise disponível para QA. Execute uma análise primeiro.");
+                return;
+            }
+
+            if (_lastScene.Summary.Particles == null || _lastScene.Summary.Particles.Count == 0)
+            {
+                AppendLog("Nenhuma partícula detectada para QA.");
+                return;
+            }
+
+            try
+            {
+                using var qaPanel = new QaParticlePanel(_lastScene, _lastBaseImageClone, _appSettings);
+                qaPanel.ShowDialog(this);
+                AppendLog("Sessão de QA de partículas finalizada.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro ao abrir painel de QA: " + ex.Message);
             }
         }
 
