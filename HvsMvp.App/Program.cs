@@ -1,11 +1,15 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace HvsMvp.App
 {
     internal static class Program
     {
+        // Splash screen display time in milliseconds (10 seconds)
+        private const int SplashDisplayTimeMs = 10000;
+
         [STAThread]
         static void Main()
         {
@@ -13,37 +17,37 @@ namespace HvsMvp.App
 
             // Show splash screen
             SplashScreen? splash = null;
+            var splashStartTime = DateTime.UtcNow;
+
             try
             {
                 splash = new SplashScreen();
                 splash.ShowSplash();
-                splash.SetMaxTimeout(5000); // Safety timeout
-
-                // Update splash status
-                splash.UpdateStatus("Carregando configurações...");
-                Thread.Sleep(300);
-
-                splash.UpdateStatus("Inicializando serviços...");
-                Thread.Sleep(300);
-
-                splash.UpdateStatus("Preparando interface...");
-                Thread.Sleep(400);
-
-                splash.UpdateStatus("Pronto!");
+                splash.SetMaxTimeout(12000); // Safety timeout: 12 seconds max
             }
             catch
             {
                 // If splash fails, continue without it
             }
 
-            // Create and show main form
+            // Create main form (but don't show yet)
             var mainForm = new MainForm();
 
-            // Close splash after main form is ready
-            mainForm.Shown += (s, e) =>
+            // When main form is shown, ensure splash stays for the required time
+            mainForm.Shown += async (s, e) =>
             {
                 try
                 {
+                    // Calculate remaining time to keep splash visible
+                    var elapsed = (DateTime.UtcNow - splashStartTime).TotalMilliseconds;
+                    var remainingMs = SplashDisplayTimeMs - (int)elapsed;
+
+                    if (remainingMs > 0)
+                    {
+                        // Wait the remaining time before closing splash
+                        await Task.Delay(remainingMs);
+                    }
+
                     splash?.CloseSplash();
                 }
                 catch
