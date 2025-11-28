@@ -67,6 +67,7 @@ namespace HvsMvp.App
         private Button _btnTxt = null!;
         private Button _btnJson = null!;
         private Button _btnCsv = null!;
+        private Button _btnBiCsv = null!;       // NOVO: BI CSV
         private Button _btnDebugHvs = null!;
         private Button _btnCalib = null!;
 
@@ -108,6 +109,7 @@ namespace HvsMvp.App
                     ["btn.txt"] = "📝 TXT",
                     ["btn.json"] = "{} JSON",
                     ["btn.csv"] = "📊 CSV",
+                    ["btn.bi.csv"] = "📈 BI CSV",   // NOVO
                     ["btn.debug"] = "🛠 Debug HVS",
                     ["btn.calib"] = "📸 Calibrar (auto)",
                     ["label.target"] = "Alvo:"
@@ -137,6 +139,7 @@ namespace HvsMvp.App
                     ["btn.txt"] = "📝 TXT",
                     ["btn.json"] = "{} JSON",
                     ["btn.csv"] = "📊 CSV",
+                    ["btn.bi.csv"] = "📈 BI CSV",
                     ["btn.debug"] = "🛠 HVS Debug",
                     ["btn.calib"] = "📸 Calibrate (auto)",
                     ["label.target"] = "Target:"
@@ -423,6 +426,11 @@ namespace HvsMvp.App
             _btnCsv.Click += BtnCsv_Click;
             _toolbarRow2.Controls.Add(_btnCsv);
 
+            // NOVO: botão BI CSV
+            _btnBiCsv = Cmd("");
+            _btnBiCsv.Click += BtnBiCsv_Click;
+            _toolbarRow2.Controls.Add(_btnBiCsv);
+
             _btnDebugHvs = Cmd("");
             _btnDebugHvs.Click += BtnDebugHvs_Click;
             _toolbarRow2.Controls.Add(_btnDebugHvs);
@@ -660,6 +668,7 @@ namespace HvsMvp.App
             _btnTxt.Text = t["btn.txt"];
             _btnJson.Text = t["btn.json"];
             _btnCsv.Text = t["btn.csv"];
+            _btnBiCsv.Text = t["btn.bi.csv"];  // novo texto BI
             _btnDebugHvs.Text = t["btn.debug"];
             _btnCalib.Text = t["btn.calib"];
             _btnLanguage.Text = $"Idioma ({_currentLocale}) ▾";
@@ -937,11 +946,69 @@ namespace HvsMvp.App
             }
         }
 
+        // BI CSV – export de linha por laudo para dashboards/Power BI
+        private void BtnBiCsv_Click(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null)
+            {
+                AppendLog("Nenhuma análise disponível para exportar BI CSV.");
+                return;
+            }
+
+            try
+            {
+                var s = _lastScene.Summary;
+
+                double pctAu = 0, pctPt = 0, pctOther = 0;
+                foreach (var m in s.Metals)
+                {
+                    if (string.Equals(m.Id, "Au", StringComparison.OrdinalIgnoreCase))
+                        pctAu = m.PctSample;
+                    else if (string.Equals(m.Id, "Pt", StringComparison.OrdinalIgnoreCase))
+                        pctPt = m.PctSample;
+                    else if (string.Equals(m.Id, "MetalOther", StringComparison.OrdinalIgnoreCase))
+                        pctOther = m.PctSample;
+                }
+
+                int particleCount = s.Particles?.Count ?? 0;
+
+                string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+                Directory.CreateDirectory(dir);
+
+                string day = DateTime.UtcNow.ToString("yyyyMMdd");
+                string path = Path.Combine(dir, $"bi_{day}.csv");
+
+                bool fileExists = File.Exists(path);
+
+                var sb = new StringBuilder();
+                if (!fileExists)
+                {
+                    sb.AppendLine("AnalysisId,DateUtc,QualityIndex,QualityStatus,PctAu,PctPt,PctMetalOther,ParticlesCount");
+                }
+
+                string line =
+                    $"{s.Id}," +
+                    $"{s.CaptureDateTimeUtc:O}," +
+                    $"{s.QualityIndex:F2}," +
+                    $"{s.QualityStatus}," +
+                    $"{pctAu:F6}," +
+                    $"{pctPt:F6}," +
+                    $"{pctOther:F6}," +
+                    $"{particleCount}";
+
+                sb.AppendLine(line);
+
+                File.AppendAllText(path, sb.ToString(), Encoding.UTF8);
+                AppendLog("Linha BI CSV exportada para: " + path);
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro ao exportar BI CSV: " + ex.Message);
+            }
+        }
+
         /// <summary>
         /// Análise seletiva coerente com Summary + LabelMap.
-        /// - Usa Summary para achar o ID exato do alvo.
-        /// - Se fração do alvo == 0, não pinta nada (e avisa).
-        /// - Só pinta pixels onde Label.MaterialId == alvo e confiança alta.
         /// </summary>
         private void BtnSelectiveAnalyze_Click(object? sender, EventArgs e)
         {
@@ -1044,7 +1111,6 @@ namespace HvsMvp.App
                 return;
             }
 
-            // Regra crítica: se a fração da amostra para esse alvo é zero, não pintar nada.
             if (pctSample <= 0)
             {
                 AppendLog($"Fração da amostra para '{alvoTexto}' é 0%. Nenhum pixel será destacado.");
@@ -1085,13 +1151,6 @@ namespace HvsMvp.App
             }
         }
 
-        /// <summary>
-        /// Usa FullSceneAnalysis.Labels para construir uma view seletiva do alvo.
-        /// Só pinta pixels:
-        /// - Dentro da amostra (Label.IsSample == true)
-        /// - Com MaterialId == targetId
-        /// - Com confiança >= 0.6
-        /// </summary>
         private Bitmap? BuildSelectiveMaskFromLabels(Bitmap baseImage, FullSceneAnalysis scene, string targetId, int tipoAlvo)
         {
             if (scene.Labels == null) return null;
@@ -1103,9 +1162,9 @@ namespace HvsMvp.App
             const double CONF_THRESHOLD = 0.6;
 
             Color overlayColor =
-                tipoAlvo == 0 ? Color.FromArgb(255, 255, 220, 0) :   // metal => amarelo
-                tipoAlvo == 1 ? Color.FromArgb(255, 0, 255, 0) :     // cristal => verde
-                                 Color.FromArgb(255, 255, 0, 255);   // gema => magenta
+                tipoAlvo == 0 ? Color.FromArgb(255, 255, 220, 0) :
+                tipoAlvo == 1 ? Color.FromArgb(255, 0, 255, 0) :
+                                 Color.FromArgb(255, 255, 0, 255);
 
             var result = new Bitmap(w, h);
             for (int y = 0; y < h; y++)
@@ -1117,7 +1176,6 @@ namespace HvsMvp.App
 
                     if (!lbl.IsSample)
                     {
-                        // Fundo azul translúcido
                         Color bg = Color.FromArgb(0, 80, 200);
                         double aBg = 0.6;
                         int rBg = (int)(src.R * (1 - aBg) + bg.R * aBg);
@@ -1127,7 +1185,6 @@ namespace HvsMvp.App
                         continue;
                     }
 
-                    // Só destaca se LabelMap bater com o alvo e confiança alta
                     if (!string.IsNullOrWhiteSpace(lbl.MaterialId) &&
                         string.Equals(lbl.MaterialId, targetId, StringComparison.OrdinalIgnoreCase) &&
                         lbl.MaterialConfidence >= CONF_THRESHOLD)
@@ -1330,7 +1387,8 @@ namespace HvsMvp.App
                     {
                         s.QualityIndex,
                         s.QualityStatus
-                    }
+                    },
+                    particles = s.Particles
                 };
                 string json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
                 string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".json");
