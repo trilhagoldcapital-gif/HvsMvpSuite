@@ -199,6 +199,17 @@ namespace HvsMvp.App
         private ViewMode _currentViewMode = ViewMode.Original;
         private string? _currentTargetMaterial;
 
+        // PR8: Advanced selective visualization state
+        private CheckBox _chkXrayMode = null!;
+        private CheckBox _chkShowUncertainty = null!;
+        private bool _xrayModeEnabled;
+        private bool _showUncertaintyEnabled;
+        private ImageOrigin _currentImageOrigin = ImageOrigin.ImageFile;
+        private bool _selectiveModeActive;
+        private bool _frameFrozen;
+        private int _selectiveRefreshCounter;
+        private const int SelectiveRefreshInterval = 2; // Update selective every N frames
+
         public MainForm()
         {
             Text = "TGC Metal Analítico – HVS-MVP";
@@ -452,6 +463,32 @@ namespace HvsMvp.App
             _btnSelectiveAnalyze = Cmd("🎯 Análise seletiva");
             _btnSelectiveAnalyze.Click += BtnSelectiveAnalyze_Click;
             _toolbarRow1.Controls.Add(_btnSelectiveAnalyze);
+
+            // PR8: X-ray mode checkbox
+            _chkXrayMode = new CheckBox
+            {
+                Text = "X-ray",
+                ForeColor = Color.Gainsboro,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Margin = new Padding(4, 6, 2, 0),
+                Checked = false
+            };
+            _chkXrayMode.CheckedChanged += ChkXrayMode_CheckedChanged;
+            _toolbarRow1.Controls.Add(_chkXrayMode);
+
+            // PR8: Show uncertainty checkbox
+            _chkShowUncertainty = new CheckBox
+            {
+                Text = "Incerteza",
+                ForeColor = Color.Gainsboro,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Margin = new Padding(4, 6, 2, 0),
+                Checked = false
+            };
+            _chkShowUncertainty.CheckedChanged += ChkShowUncertainty_CheckedChanged;
+            _toolbarRow1.Controls.Add(_chkShowUncertainty);
 
             _btnMask = Cmd("");
             _btnMask.Click += BtnMascara_Click;
@@ -896,6 +933,10 @@ namespace HvsMvp.App
                     _lastBaseImageClone?.Dispose();
                     _lastBaseImageClone = (Bitmap)bmp.Clone();
                     _lastScene = null;
+                    // PR8: Update image origin
+                    _currentImageOrigin = ImageOrigin.ImageFile;
+                    _frameFrozen = false;
+                    _selectiveModeActive = false;
                     SetViewMode(ViewMode.Original);
                     ApplyZoom();
                     AppendLog($"Imagem carregada: {Path.GetFileName(dlg.FileName)}");
@@ -917,14 +958,15 @@ namespace HvsMvp.App
         /// <summary>
         /// Define o modo de visualização atual e atualiza o status na UI.
         /// PR7 - Fase 1: Controle claro de modo de visualização.
+        /// PR8: Inclui informação de modo X-ray.
         /// </summary>
         private void SetViewMode(ViewMode mode, string? targetMaterial = null)
         {
             _currentViewMode = mode;
             _currentTargetMaterial = targetMaterial;
             
-            // Atualizar label de status com descrição do modo
-            string description = VisualizationService.GetViewModeDescription(mode, targetMaterial);
+            // Atualizar label de status com descrição do modo (PR8: inclui X-ray)
+            string description = VisualizationService.GetViewModeDescription(mode, targetMaterial, _xrayModeEnabled);
             AppendLog(description);
         }
 
@@ -944,6 +986,9 @@ namespace HvsMvp.App
                 _microscopeCamera.Start();
 
                 _liveRunning = true;
+                // PR8: Update image origin
+                _currentImageOrigin = ImageOrigin.CameraLive;
+                _frameFrozen = false;
                 AppendLog($"Live microscópio iniciado – câmera {_cameraIndex}, {_cameraWidth}x{_cameraHeight}.");
             }
             catch (Exception ex)
@@ -965,7 +1010,24 @@ namespace HvsMvp.App
             {
                 _microscopeCamera.Stop();
                 _liveRunning = false;
-                AppendLog("Live microscópio parado.");
+                
+                // PR8: Frame freezing - maintain last scene for selective analysis
+                _frameFrozen = true;
+                _currentImageOrigin = ImageOrigin.CameraFrozen;
+                
+                AppendLog("Live microscópio parado – Frame congelado para análise.");
+                
+                // PR8: If there's no analysis yet but we have an image, run analysis
+                if (_lastScene == null && _pictureSample.Image != null && _analysisService != null)
+                {
+                    AppendLog("Executando análise no frame congelado...");
+                    using var bmp = new Bitmap(_pictureSample.Image);
+                    _lastScene = _analysisService.AnalyzeScene(bmp, null);
+                    _lastBaseImageClone?.Dispose();
+                    _lastBaseImageClone = (Bitmap)bmp.Clone();
+                    UpdateMaterialListsFromScene();
+                    AppendLog("✅ Análise concluída. Frame pronto para análise seletiva.");
+                }
             }
             catch (Exception ex)
             {
@@ -1210,14 +1272,31 @@ namespace HvsMvp.App
         }
 
         /// <summary>
-        /// Análise seletiva unificada (PR7 - Fase 1).
+        /// Análise seletiva unificada (PR7 - Fase 1, atualizado PR8).
         /// Funciona igualmente para imagem estática, frame de câmera e modo contínuo.
-        /// Usa a classificação base existente - apenas FILTRA para o alvo selecionado.
+        /// PR8: Suporta modo X-ray, Au+PGM combinado, e visualização de incerteza.
         /// </summary>
         private void BtnSelectiveAnalyze_Click(object? sender, EventArgs e)
         {
             try
             {
+                // PR8: Toggle selective mode if already active
+                if (_selectiveModeActive && _currentViewMode == ViewMode.SeletivaAlvo || 
+                    _currentViewMode == ViewMode.SeletivaXray || 
+                    _currentViewMode == ViewMode.SeletivaAuPgm)
+                {
+                    // Deactivate selective mode, return to original
+                    _selectiveModeActive = false;
+                    if (_lastBaseImageClone != null)
+                    {
+                        _pictureSample.Image?.Dispose();
+                        _pictureSample.Image = (Bitmap)_lastBaseImageClone.Clone();
+                    }
+                    SetViewMode(ViewMode.Original);
+                    AppendLog("Análise seletiva desativada.");
+                    return;
+                }
+
                 // Verificar se há uma análise disponível
                 if (_lastScene == null)
                 {
@@ -1254,164 +1333,219 @@ namespace HvsMvp.App
                 }
 
                 string alvoTexto = _cbTarget.SelectedItem.ToString() ?? "(desconhecido)";
-                AppendLog($"🎯 Análise seletiva para: {alvoTexto}");
+                string modeInfo = _xrayModeEnabled ? " (X-ray)" : "";
+                if (_showUncertaintyEnabled) modeInfo += " (Incerteza)";
+                AppendLog($"🎯 Análise seletiva para: {alvoTexto}{modeInfo}");
 
-                var summary = _lastScene.Summary;
-                var sb = new StringBuilder();
-                sb.AppendLine($"🎯 Análise seletiva – {alvoTexto}");
-                sb.AppendLine("--------------------------------");
+                // PR8: Activate selective mode
+                _selectiveModeActive = true;
 
-                // Extrair informações do alvo
-                string? targetId = null;
-                int tipoAlvo = -1;
-                double pctSample = 0;
-                string? targetName = null;
-
-                if (alvoTexto.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
+                // PR8: Check for Au+PGM combined mode
+                if (alvoTexto.StartsWith("Alvo: Au + PGM", StringComparison.OrdinalIgnoreCase))
                 {
-                    string name = alvoTexto.Substring("Metal:".Length).Trim();
-                    var m = summary.Metals.Find(x =>
-                        string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
-
-                    if (m != null)
-                    {
-                        var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
-                        sb.AppendLine($"ID: {m.Id}");
-                        sb.AppendLine($"Nome: {m.Name}");
-                        sb.AppendLine($"Grupo: {m.Group}");
-                        sb.AppendLine($"Fração na amostra: {m.PctSample:P4}");
-                        sb.AppendLine($"PPM estimado: {ppm}");
-                        sb.AppendLine($"Score combinado: {m.Score:F3}");
-                        targetId = m.Id;
-                        targetName = m.Name;
-                        pctSample = m.PctSample;
-                        tipoAlvo = 0;
-                    }
-                    else
-                    {
-                        // Tentar encontrar pelo nome no combo (pode não estar no resultado atual)
-                        targetId = ExtractMaterialIdFromName(name);
-                        targetName = name;
-                        tipoAlvo = 0;
-                        sb.AppendLine($"⚠️ Metal '{name}' não encontrado na última análise (0% na amostra).");
-                        sb.AppendLine("Metais disponíveis:");
-                        foreach (var metal in summary.Metals.OrderByDescending(x => x.PctSample).Take(5))
-                        {
-                            sb.AppendLine($"  - {metal.Name} ({metal.Id}): {metal.PctSample:P3}");
-                        }
-                    }
-                }
-                else if (alvoTexto.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
-                {
-                    string name = alvoTexto.Substring("Cristal:".Length).Trim();
-                    var c = summary.Crystals.Find(x =>
-                        string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
-                    if (c != null)
-                    {
-                        sb.AppendLine($"ID: {c.Id}");
-                        sb.AppendLine($"Nome: {c.Name}");
-                        sb.AppendLine($"Fração na amostra: {c.PctSample:P4}");
-                        sb.AppendLine($"Score combinado: {c.Score:F3}");
-                        targetId = c.Id;
-                        targetName = c.Name;
-                        pctSample = c.PctSample;
-                        tipoAlvo = 1;
-                    }
-                    else
-                    {
-                        targetId = ExtractMaterialIdFromName(name);
-                        targetName = name;
-                        tipoAlvo = 1;
-                        sb.AppendLine($"⚠️ Cristal '{name}' não encontrado na última análise.");
-                    }
-                }
-                else if (alvoTexto.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
-                {
-                    string name = alvoTexto.Substring("Gema:".Length).Trim();
-                    var g = summary.Gems.Find(x =>
-                        string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
-                    if (g != null)
-                    {
-                        sb.AppendLine($"ID: {g.Id}");
-                        sb.AppendLine($"Nome: {g.Name}");
-                        sb.AppendLine($"Fração na amostra: {g.PctSample:P4}");
-                        sb.AppendLine($"Score combinado: {g.Score:F3}");
-                        targetId = g.Id;
-                        targetName = g.Name;
-                        pctSample = g.PctSample;
-                        tipoAlvo = 2;
-                    }
-                    else
-                    {
-                        targetId = ExtractMaterialIdFromName(name);
-                        targetName = name;
-                        tipoAlvo = 2;
-                        sb.AppendLine($"⚠️ Gema '{name}' não encontrada na última análise.");
-                    }
+                    ApplyAuPgmSelectiveView();
+                    return;
                 }
 
-                // Add focus warning to details if needed
+                // Standard single-target selective analysis
+                ApplySingleTargetSelectiveViewWithDetails(alvoTexto, focusIsBad);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"❌ Erro na análise seletiva: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PR8: Apply single target selective view with full details (used by button click).
+        /// </summary>
+        private void ApplySingleTargetSelectiveViewWithDetails(string alvoTexto, bool focusIsBad)
+        {
+            if (_lastScene == null || _lastBaseImageClone == null)
+                return;
+
+            var summary = _lastScene.Summary;
+            var sb = new StringBuilder();
+            sb.AppendLine($"🎯 Análise seletiva – {alvoTexto}");
+            sb.AppendLine("────────────────────────────────────────");
+
+            // Extrair informações do alvo
+            string? targetId = null;
+            int tipoAlvo = -1;
+            double pctSample = 0;
+            string? targetName = null;
+
+            if (alvoTexto.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
+            {
+                string name = alvoTexto.Substring("Metal:".Length).Trim();
+                var m = summary.Metals.Find(x =>
+                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
+
+                if (m != null)
+                {
+                    var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
+                    sb.AppendLine($"ID: {m.Id}");
+                    sb.AppendLine($"Nome: {m.Name}");
+                    sb.AppendLine($"Grupo: {m.Group}");
+                    sb.AppendLine($"Fração na amostra: {m.PctSample:P4}");
+                    sb.AppendLine($"PPM estimado: {ppm}");
+                    sb.AppendLine($"Score combinado: {m.Score:F3}");
+                    targetId = m.Id;
+                    targetName = m.Name;
+                    pctSample = m.PctSample;
+                    tipoAlvo = 0;
+                }
+                else
+                {
+                    targetId = ExtractMaterialIdFromName(name);
+                    targetName = name;
+                    tipoAlvo = 0;
+                    sb.AppendLine($"⚠️ Metal '{name}' não encontrado na última análise (0% na amostra).");
+                    sb.AppendLine("Metais disponíveis:");
+                    foreach (var metal in summary.Metals.OrderByDescending(x => x.PctSample).Take(5))
+                    {
+                        sb.AppendLine($"  - {metal.Name} ({metal.Id}): {metal.PctSample:P3}");
+                    }
+                }
+            }
+            else if (alvoTexto.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
+            {
+                string name = alvoTexto.Substring("Cristal:".Length).Trim();
+                var c = summary.Crystals.Find(x =>
+                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
+                if (c != null)
+                {
+                    sb.AppendLine($"ID: {c.Id}");
+                    sb.AppendLine($"Nome: {c.Name}");
+                    sb.AppendLine($"Fração na amostra: {c.PctSample:P4}");
+                    sb.AppendLine($"Score combinado: {c.Score:F3}");
+                    targetId = c.Id;
+                    targetName = c.Name;
+                    pctSample = c.PctSample;
+                    tipoAlvo = 1;
+                }
+                else
+                {
+                    targetId = ExtractMaterialIdFromName(name);
+                    targetName = name;
+                    tipoAlvo = 1;
+                    sb.AppendLine($"⚠️ Cristal '{name}' não encontrado na última análise.");
+                }
+            }
+            else if (alvoTexto.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
+            {
+                string name = alvoTexto.Substring("Gema:".Length).Trim();
+                var g = summary.Gems.Find(x =>
+                    string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
+                if (g != null)
+                {
+                    sb.AppendLine($"ID: {g.Id}");
+                    sb.AppendLine($"Nome: {g.Name}");
+                    sb.AppendLine($"Fração na amostra: {g.PctSample:P4}");
+                    sb.AppendLine($"Score combinado: {g.Score:F3}");
+                    targetId = g.Id;
+                    targetName = g.Name;
+                    pctSample = g.PctSample;
+                    tipoAlvo = 2;
+                }
+                else
+                {
+                    targetId = ExtractMaterialIdFromName(name);
+                    targetName = name;
+                    tipoAlvo = 2;
+                    sb.AppendLine($"⚠️ Gema '{name}' não encontrada na última análise.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(targetId))
+            {
+                AppendLog("⚠️ Nenhum ID de alvo encontrado no resumo. Nada para destacar.");
+                _selectiveModeActive = false;
+                return;
+            }
+
+            // Generate selective view
+            using var baseImg = new Bitmap(_lastBaseImageClone);
+            Bitmap? selective = null;
+            SelectiveConfidenceResult? confResult = null;
+
+            if (_xrayModeEnabled)
+            {
+                selective = VisualizationService.BuildSelectiveXrayView(
+                    baseImg,
+                    _lastScene,
+                    targetId,
+                    out confResult,
+                    materialType: tipoAlvo,
+                    confidenceThreshold: 0.5,
+                    showUncertainty: _showUncertaintyEnabled);
+            }
+            else
+            {
+                selective = VisualizationService.BuildSelectiveView(
+                    baseImg,
+                    _lastScene,
+                    targetId,
+                    tipoAlvo,
+                    confidenceThreshold: 0.5);
+                confResult = BuildConfidenceResultFromScene(_lastScene, targetId);
+            }
+
+            if (selective != null)
+            {
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = (Bitmap)selective.Clone();
+                
+                // Atualizar ViewMode e status
+                _currentTargetMaterial = targetName ?? targetId;
+                SetViewMode(_xrayModeEnabled ? ViewMode.SeletivaXray : ViewMode.SeletivaAlvo, _currentTargetMaterial);
+                
+                // PR8: Build enhanced summary
+                if (confResult != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"Área alta confiança: {confResult.HighConfidencePercent:F0}% da área {_currentTargetMaterial}");
+                    sb.AppendLine($"Área baixa confiança: {confResult.LowConfidencePercent:F0}% (zona de transição)");
+                    sb.AppendLine($"Partículas: {confResult.ParticleCount}");
+                }
+
+                // Add focus warning
                 if (focusIsBad)
                 {
                     sb.AppendLine();
                     sb.AppendLine("⚠️ ATENÇÃO: foco ruim – resultados apenas indicativos.");
                 }
 
+                // PR8: Add origin and mode info
+                sb.AppendLine();
+                sb.AppendLine($"Origem: {VisualizationService.GetImageOriginDescription(_currentImageOrigin)}");
+                if (_xrayModeEnabled)
+                    sb.AppendLine("Modo: X-ray");
+                if (_showUncertaintyEnabled)
+                    sb.AppendLine("Visualização de incerteza: Ativa");
+
                 _txtDetails.Text = sb.ToString();
-
-                if (string.IsNullOrWhiteSpace(targetId))
+                
+                _zoomFactor = 1.0f;
+                ApplyZoom();
+                
+                string modeStr = _xrayModeEnabled ? " (X-ray)" : "";
+                if (pctSample > 0)
                 {
-                    AppendLog("⚠️ Nenhum ID de alvo encontrado no resumo. Nada para destacar.");
-                    return;
-                }
-
-                if (_lastBaseImageClone == null)
-                {
-                    AppendLog("⚠️ Imagem base ausente para máscara seletiva.");
-                    return;
-                }
-
-                // PR7 - Fase 1: Usar método unificado BuildSelectiveView
-                using var baseImg = new Bitmap(_lastBaseImageClone);
-                var selective = VisualizationService.BuildSelectiveView(
-                    baseImg,
-                    _lastScene,
-                    targetId,
-                    tipoAlvo,
-                    confidenceThreshold: 0.5);
-
-                if (selective != null)
-                {
-                    _pictureSample.Image?.Dispose();
-                    _pictureSample.Image = (Bitmap)selective.Clone();
-                    
-                    // Atualizar ViewMode e status
-                    _currentTargetMaterial = targetName ?? targetId;
-                    SetViewMode(ViewMode.SeletivaAlvo, _currentTargetMaterial);
-                    
-                    _zoomFactor = 1.0f;
-                    ApplyZoom();
-                    
-                    if (pctSample > 0)
-                    {
-                        AppendLog($"✅ Análise seletiva aplicada para '{targetId}' ({pctSample:P2} da amostra).");
-                    }
-                    else
-                    {
-                        AppendLog($"ℹ️ Análise seletiva para '{targetId}': 0% detectado nesta amostra.");
-                    }
+                    AppendLog($"✅ Análise seletiva{modeStr} aplicada para '{targetId}' ({pctSample:P2} da amostra).");
                 }
                 else
                 {
-                    AppendLog("❌ Falha ao gerar visualização seletiva.");
+                    AppendLog($"ℹ️ Análise seletiva{modeStr} para '{targetId}': 0% detectado nesta amostra.");
                 }
             }
-            catch (Exception ex)
+            else
             {
-                AppendLog($"❌ Erro na análise seletiva: {ex.Message}");
+                AppendLog("❌ Falha ao gerar visualização seletiva.");
+                _selectiveModeActive = false;
             }
         }
 
@@ -2257,6 +2391,9 @@ namespace HvsMvp.App
                 }
             }
 
+            // PR8: Add Au+PGM combined option
+            _cbTarget.Items.Insert(0, "Alvo: Au + PGM");
+
             if (_cbTarget.Items.Count > 0)
                 _cbTarget.SelectedIndex = 0;
 
@@ -2287,6 +2424,214 @@ namespace HvsMvp.App
             _txtDetails.Text = sb.ToString();
         }
 
+        // PR8: X-ray mode checkbox handler
+        private void ChkXrayMode_CheckedChanged(object? sender, EventArgs e)
+        {
+            _xrayModeEnabled = _chkXrayMode.Checked;
+            AppendLog($"Modo X-ray: {(_xrayModeEnabled ? "Ativado" : "Desativado")}");
+            
+            // If selective mode is active, refresh the visualization
+            if (_selectiveModeActive && _lastScene != null && _lastBaseImageClone != null)
+            {
+                RefreshSelectiveVisualization();
+            }
+        }
+
+        // PR8: Uncertainty visualization checkbox handler
+        private void ChkShowUncertainty_CheckedChanged(object? sender, EventArgs e)
+        {
+            _showUncertaintyEnabled = _chkShowUncertainty.Checked;
+            AppendLog($"Visualização de incerteza: {(_showUncertaintyEnabled ? "Ativada" : "Desativada")}");
+            
+            // If selective mode is active, refresh the visualization
+            if (_selectiveModeActive && _lastScene != null && _lastBaseImageClone != null)
+            {
+                RefreshSelectiveVisualization();
+            }
+        }
+
+        // PR8: Refresh selective visualization (used after mode changes or during live)
+        private void RefreshSelectiveVisualization()
+        {
+            if (_lastScene == null || _lastBaseImageClone == null)
+                return;
+
+            if (_cbTarget == null || _cbTarget.SelectedItem == null)
+                return;
+
+            string alvoTexto = _cbTarget.SelectedItem.ToString() ?? "";
+
+            // Check if Au+PGM combined mode
+            if (alvoTexto.StartsWith("Alvo: Au + PGM", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyAuPgmSelectiveView();
+            }
+            else
+            {
+                ApplySingleTargetSelectiveView(alvoTexto);
+            }
+        }
+
+        // PR8: Apply Au+PGM combined selective view
+        private void ApplyAuPgmSelectiveView()
+        {
+            if (_lastScene == null || _lastBaseImageClone == null)
+                return;
+
+            using var baseImg = new Bitmap(_lastBaseImageClone);
+            var selective = VisualizationService.BuildSelectiveAuPgmView(
+                baseImg,
+                _lastScene,
+                _xrayModeEnabled,
+                out var combinedResult,
+                confidenceThreshold: 0.5,
+                showUncertainty: _showUncertaintyEnabled);
+
+            if (selective != null)
+            {
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = (Bitmap)selective.Clone();
+
+                _currentTargetMaterial = "Au+PGM";
+                SetViewMode(_xrayModeEnabled ? ViewMode.SeletivaXray : ViewMode.SeletivaAuPgm, _currentTargetMaterial);
+
+                if (combinedResult != null)
+                {
+                    _txtDetails.Text = VisualizationService.BuildAuPgmSummary(
+                        combinedResult, _currentImageOrigin, _xrayModeEnabled);
+                }
+
+                _zoomFactor = 1.0f;
+                ApplyZoom();
+                AppendLog($"✅ Análise seletiva Au+PGM aplicada{(_xrayModeEnabled ? " (X-ray)" : "")}.");
+            }
+        }
+
+        // PR8: Apply single target selective view
+        private void ApplySingleTargetSelectiveView(string alvoTexto)
+        {
+            if (_lastScene == null || _lastBaseImageClone == null)
+                return;
+
+            string? targetId = null;
+            string? targetName = null;
+            int tipoAlvo = 0;
+
+            // Parse target from combo text
+            if (alvoTexto.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
+            {
+                targetName = alvoTexto.Substring("Metal:".Length).Trim();
+                targetId = ExtractMaterialIdFromName(targetName);
+                tipoAlvo = 0;
+            }
+            else if (alvoTexto.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
+            {
+                targetName = alvoTexto.Substring("Cristal:".Length).Trim();
+                targetId = ExtractMaterialIdFromName(targetName);
+                tipoAlvo = 1;
+            }
+            else if (alvoTexto.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
+            {
+                targetName = alvoTexto.Substring("Gema:".Length).Trim();
+                targetId = ExtractMaterialIdFromName(targetName);
+                tipoAlvo = 2;
+            }
+
+            if (string.IsNullOrWhiteSpace(targetId))
+                return;
+
+            using var baseImg = new Bitmap(_lastBaseImageClone);
+
+            Bitmap? selective = null;
+            SelectiveConfidenceResult? confResult = null;
+
+            if (_xrayModeEnabled)
+            {
+                selective = VisualizationService.BuildSelectiveXrayView(
+                    baseImg,
+                    _lastScene,
+                    targetId,
+                    out confResult,
+                    materialType: tipoAlvo,
+                    confidenceThreshold: 0.5,
+                    showUncertainty: _showUncertaintyEnabled);
+            }
+            else
+            {
+                selective = VisualizationService.BuildSelectiveView(
+                    baseImg,
+                    _lastScene,
+                    targetId,
+                    tipoAlvo,
+                    confidenceThreshold: 0.5);
+
+                // Build confidence result for standard view
+                confResult = BuildConfidenceResultFromScene(_lastScene, targetId);
+            }
+
+            if (selective != null)
+            {
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = (Bitmap)selective.Clone();
+
+                _currentTargetMaterial = targetName ?? targetId;
+                SetViewMode(_xrayModeEnabled ? ViewMode.SeletivaXray : ViewMode.SeletivaAlvo, _currentTargetMaterial);
+
+                if (confResult != null)
+                {
+                    _txtDetails.Text = VisualizationService.BuildSelectiveSummary(
+                        _currentTargetMaterial, confResult, _currentImageOrigin, _xrayModeEnabled);
+                }
+
+                _zoomFactor = 1.0f;
+                ApplyZoom();
+            }
+        }
+
+        // PR8: Build confidence result from scene for standard selective view
+        private SelectiveConfidenceResult? BuildConfidenceResultFromScene(FullSceneAnalysis scene, string targetId)
+        {
+            if (scene?.Labels == null) return null;
+
+            int totalTarget = 0;
+            int highConf = 0;
+            int lowConf = 0;
+            int totalSample = 0;
+
+            int w = scene.Width;
+            int h = scene.Height;
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var lbl = scene.Labels[x, y];
+                    if (lbl == null || !lbl.IsSample) continue;
+                    totalSample++;
+
+                    if (string.Equals(lbl.MaterialId, targetId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        totalTarget++;
+                        if (lbl.MaterialConfidence >= 0.7)
+                            highConf++;
+                        else
+                            lowConf++;
+                    }
+                }
+            }
+
+            return new SelectiveConfidenceResult
+            {
+                TotalTargetPixels = totalTarget,
+                HighConfidencePixels = highConf,
+                LowConfidencePixels = lowConf,
+                TargetFractionOfSample = totalSample > 0 ? (double)totalTarget / totalSample : 0,
+                PpmEstimated = totalSample > 0 ? ((double)totalTarget / totalSample) * 1_000_000 : 0,
+                ParticleCount = scene.Summary?.Particles?.Count(p => 
+                    string.Equals(p.MaterialId, targetId, StringComparison.OrdinalIgnoreCase)) ?? 0
+            };
+        }
+
         // ====== Análise contínua ======
         private void BtnContinuous_Click(object? sender, EventArgs e)
         {
@@ -2300,6 +2645,10 @@ namespace HvsMvp.App
                 AppendLog("Serviço de análise indisponível.");
                 return;
             }
+
+            // PR8: Update image origin
+            _currentImageOrigin = ImageOrigin.CameraContinuous;
+            _frameFrozen = false;
 
             // PR7 - Fase 1: Usar construtor com FullSceneAnalysis para suportar análise seletiva em modo contínuo
             _continuousController = new ContinuousAnalysisController(
@@ -2327,8 +2676,19 @@ namespace HvsMvp.App
                 _continuousController?.Stop();
                 _continuousController = null;
                 _continuousRunning = false;
-                _lblStatus.Text = "Modo contínuo parado";
-                AppendLog("Modo contínuo encerrado.");
+
+                // PR8: Frame freezing - keep last scene and selective view active
+                _frameFrozen = true;
+                _currentImageOrigin = ImageOrigin.CameraFrozen;
+                
+                _lblStatus.Text = "Modo contínuo parado – Frame congelado";
+                AppendLog("Modo contínuo encerrado. Frame congelado para análise.");
+
+                // PR8: If selective mode was active, update the summary to show frozen state
+                if (_selectiveModeActive && _lastScene != null)
+                {
+                    AppendLog("Análise seletiva mantida no frame congelado. Você pode mudar alvo/modo.");
+                }
             }
             catch (Exception ex)
             {
@@ -2337,8 +2697,9 @@ namespace HvsMvp.App
         }
 
         /// <summary>
-        /// Handler para análise contínua com cena completa (PR7 - Fase 1).
+        /// Handler para análise contínua com cena completa (PR7 - Fase 1, atualizado PR8).
         /// Armazena a cena completa para permitir análise seletiva em modo contínuo/live.
+        /// PR8: Atualiza visualização seletiva persistente a cada frame.
         /// </summary>
         private void OnContinuousSceneAnalysis(FullSceneAnalysis scene)
         {
@@ -2355,8 +2716,23 @@ namespace HvsMvp.App
             }
 
             UpdateMaterialListsFromScene();
+
+            // PR8: Atualizar visualização seletiva persistente
+            if (_selectiveModeActive)
+            {
+                _selectiveRefreshCounter++;
+                if (_selectiveRefreshCounter >= SelectiveRefreshInterval)
+                {
+                    _selectiveRefreshCounter = 0;
+                    RefreshSelectiveVisualization();
+                }
+            }
+
+            // PR8: Update status with origin info
+            string originInfo = VisualizationService.GetImageOriginDescription(_currentImageOrigin);
+            string viewModeInfo = _selectiveModeActive ? $" | Seletiva: {_currentTargetMaterial}" : "";
             _lblStatus.Text =
-                $"Contínuo: foco={scene.Summary.Diagnostics.FocusScore:F2} · Qualidade={scene.Summary.QualityIndex:F1} ({scene.Summary.QualityStatus})";
+                $"Contínuo: foco={scene.Summary.Diagnostics.FocusScore:F2} · Qualidade={scene.Summary.QualityIndex:F1} ({scene.Summary.QualityStatus}){viewModeInfo}";
 
             // Update quality panel
             _qualityPanel.UpdateFromDiagnostics(scene.Summary.Diagnostics);
