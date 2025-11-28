@@ -20,8 +20,8 @@ namespace HvsMvp.App
         private bool _fadingIn = true;
         private bool _fadingOut = false;
 
-        private const int MinDisplayTimeMs = 2000;
-        private const int MaxDisplayTimeMs = 7000;
+        private const int MinDisplayTimeMs = 10000;
+        private const int MaxDisplayTimeMs = 12000;
         private const int AnimationIntervalMs = 30;
 
         public SplashScreen()
@@ -218,10 +218,10 @@ namespace HvsMvp.App
                 Opacity = _opacity;
             }
 
-            // Progress bar animation
+            // Progress bar animation - fills gradually (splash closes at 10s via timer)
             if (!_fadingOut && _progressValue < 400)
             {
-                _progressValue += 8;
+                _progressValue += 1;  // Slow fill; splash closes before bar is full for smooth exit
                 if (_progressValue > 400) _progressValue = 400;
                 _progressBar.Width = _progressValue;
 
@@ -230,7 +230,7 @@ namespace HvsMvp.App
                     _lblStatus.Text = "Carregando configurações...";
                 else if (_progressValue < 200)
                     _lblStatus.Text = "Inicializando serviços...";
-                else if (_progressValue < 300)
+                else if (_progressValue < 350)
                     _lblStatus.Text = "Preparando interface...";
                 else
                     _lblStatus.Text = "Pronto!";
