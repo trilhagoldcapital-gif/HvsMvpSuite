@@ -12,8 +12,21 @@ namespace HvsMvp.App
     {
         // Metais nobres
         public static readonly Color Gold = Color.FromArgb(255, 215, 0);           // Au - Dourado
-        public static readonly Color Platinum = Color.FromArgb(148, 100, 168);     // Pt/PGM - Roxo/cinza
         public static readonly Color Silver = Color.FromArgb(192, 192, 192);       // Ag - Prata
+        public static readonly Color Platinum = Color.FromArgb(148, 100, 168);     // Pt/PGM - Roxo/cinza
+        public static readonly Color Palladium = Color.FromArgb(160, 140, 180);    // Pd - Lilás claro
+        public static readonly Color Rhodium = Color.FromArgb(200, 200, 220);      // Rh - Branco azulado
+        public static readonly Color Iridium = Color.FromArgb(130, 130, 150);      // Ir - Cinza azulado
+        public static readonly Color Ruthenium = Color.FromArgb(140, 140, 140);    // Ru - Cinza
+        public static readonly Color Osmium = Color.FromArgb(100, 100, 120);       // Os - Cinza escuro
+
+        // Metais comuns
+        public static readonly Color Copper = Color.FromArgb(184, 115, 51);        // Cu - Cobre
+        public static readonly Color Iron = Color.FromArgb(139, 69, 19);           // Fe - Ferro
+        public static readonly Color Aluminum = Color.FromArgb(210, 210, 210);     // Al - Alumínio
+        public static readonly Color Nickel = Color.FromArgb(170, 170, 180);       // Ni - Níquel
+        public static readonly Color Zinc = Color.FromArgb(180, 180, 190);         // Zn - Zinco
+        public static readonly Color Lead = Color.FromArgb(80, 80, 90);            // Pb - Chumbo
 
         // Sulfetos
         public static readonly Color Sulfide = Color.FromArgb(255, 165, 0);        // Sulfetos - Laranja
@@ -23,9 +36,21 @@ namespace HvsMvp.App
         public static readonly Color Silicate = Color.FromArgb(0, 191, 255);       // Silicatos - Azul
         public static readonly Color Gangue = Color.FromArgb(100, 149, 237);       // Ganga - Azul claro
 
+        // Cristais
+        public static readonly Color Quartz = Color.FromArgb(245, 245, 250);       // Quartzo - Branco
+        public static readonly Color Calcite = Color.FromArgb(255, 250, 230);      // Calcita - Creme
+        public static readonly Color Feldspar = Color.FromArgb(255, 220, 200);     // Feldspato - Rosa pálido
+        public static readonly Color Mica = Color.FromArgb(190, 160, 100);         // Mica - Bronze
+        public static readonly Color Fluorite = Color.FromArgb(148, 0, 211);       // Fluorita - Violeta
+
+        // Gemas
+        public static readonly Color Diamond = Color.FromArgb(255, 255, 255);      // Diamante - Branco
+        public static readonly Color Sapphire = Color.FromArgb(15, 82, 186);       // Safira - Azul
+        public static readonly Color Ruby = Color.FromArgb(155, 17, 30);           // Rubi - Vermelho
+        public static readonly Color Emerald = Color.FromArgb(80, 200, 120);       // Esmeralda - Verde
+        public static readonly Color Amethyst = Color.FromArgb(153, 102, 204);     // Ametista - Roxo
+
         // Outros metais
-        public static readonly Color Copper = Color.FromArgb(184, 115, 51);        // Cobre
-        public static readonly Color Iron = Color.FromArgb(139, 69, 19);           // Ferro
         public static readonly Color OtherMetal = Color.FromArgb(46, 139, 87);     // Outros - Verde
 
         // Background
@@ -44,29 +69,37 @@ namespace HvsMvp.App
 
             return materialId.ToUpperInvariant() switch
             {
+                // Metais nobres
                 "AU" => Gold,
                 "OURO" => Gold,
                 "GOLD" => Gold,
+
+                "AG" => Silver,
+                "PRATA" => Silver,
+                "SILVER" => Silver,
 
                 "PT" => Platinum,
                 "PLATINA" => Platinum,
                 "PGM" => Platinum,
                 "PLATINUM" => Platinum,
 
-                "AG" => Silver,
-                "PRATA" => Silver,
-                "SILVER" => Silver,
+                "PD" => Palladium,
+                "PALADIA" => Palladium,
+                "PALÁDIO" => Palladium,
 
-                "SULFETO" => Sulfide,
-                "SULFIDE" => Sulfide,
-                "PIRITA" => Pyrite,
-                "PYRITE" => Pyrite,
+                "RH" => Rhodium,
+                "RÓDIO" => Rhodium,
 
-                "SILICATO" => Silicate,
-                "SILICATE" => Silicate,
-                "GANGA" => Gangue,
-                "GANGUE" => Gangue,
+                "IR" => Iridium,
+                "IRÍDIO" => Iridium,
 
+                "RU" => Ruthenium,
+                "RUTÊNIO" => Ruthenium,
+
+                "OS" => Osmium,
+                "ÓSMIO" => Osmium,
+
+                // Metais comuns
                 "CU" => Copper,
                 "COBRE" => Copper,
                 "COPPER" => Copper,
@@ -75,6 +108,73 @@ namespace HvsMvp.App
                 "FERRO" => Iron,
                 "IRON" => Iron,
 
+                "AL" => Aluminum,
+                "ALUMÍNIO" => Aluminum,
+                "ALUMINUM" => Aluminum,
+
+                "NI" => Nickel,
+                "NÍQUEL" => Nickel,
+                "NICKEL" => Nickel,
+
+                "ZN" => Zinc,
+                "ZINCO" => Zinc,
+
+                "PB" => Lead,
+                "CHUMBO" => Lead,
+                "LEAD" => Lead,
+
+                // Sulfetos
+                "SULFETO" => Sulfide,
+                "SULFIDE" => Sulfide,
+                "PIRITA" => Pyrite,
+                "PYRITE" => Pyrite,
+
+                // Silicatos
+                "SILICATO" => Silicate,
+                "SILICATE" => Silicate,
+                "GANGA" => Gangue,
+                "GANGUE" => Gangue,
+
+                // Cristais
+                "SIO2" => Quartz,
+                "QUARTZO" => Quartz,
+                "QUARTZ" => Quartz,
+
+                "CACO3" => Calcite,
+                "CALCITA" => Calcite,
+                "CALCITE" => Calcite,
+
+                "FELDSPATO" => Feldspar,
+                "FELDSPAR" => Feldspar,
+
+                "MICA" => Mica,
+
+                "CAF2" => Fluorite,
+                "FLUORITA" => Fluorite,
+                "FLUORITE" => Fluorite,
+
+                // Gemas
+                "C" => Diamond,
+                "DIAMANTE" => Diamond,
+                "DIAMOND" => Diamond,
+
+                "AL2O3_BLUE" => Sapphire,
+                "SAFIRA" => Sapphire,
+                "SAPPHIRE" => Sapphire,
+
+                "AL2O3_RED" => Ruby,
+                "RUBI" => Ruby,
+                "RUBY" => Ruby,
+
+                "BE3AL2SI6O18" => Emerald,
+                "ESMERALDA" => Emerald,
+                "EMERALD" => Emerald,
+
+                "SIO2_PURPLE" => Amethyst,
+                "AMETISTA" => Amethyst,
+                "AMETHYST" => Amethyst,
+
+                // Outros
                 "METALOTHER" => OtherMetal,
                 "OTHER" => OtherMetal,
 

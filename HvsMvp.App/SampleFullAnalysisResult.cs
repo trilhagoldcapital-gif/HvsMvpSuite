@@ -96,6 +96,11 @@ namespace HvsMvp.App
         public double ForegroundFraction { get; set; }
 
         /// <summary>
+        /// Status da fração de foreground: "Muito baixa", "Baixa", "OK", "Alta", "Muito alta".
+        /// </summary>
+        public string ForegroundFractionStatus { get; set; } = "OK";
+
+        /// <summary>
         /// Foco em escala 0..100 (BLOCO 1).
         /// </summary>
         public double FocusScorePercent { get; set; }
@@ -119,6 +124,11 @@ namespace HvsMvp.App
         /// Status da qualidade (idem SampleFullAnalysisResult.QualityStatus, mas aqui por conveniência).
         /// </summary>
         public string QualityStatus { get; set; } = "Preliminary";
+
+        /// <summary>
+        /// Lista de avisos/warnings sobre a máscara.
+        /// </summary>
+        public List<string> MaskWarnings { get; set; } = new List<string>();
     }
 
     /// <summary>

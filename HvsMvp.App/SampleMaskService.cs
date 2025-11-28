@@ -185,9 +185,10 @@ namespace HvsMvp.App
             double varG = Math.Max(0, (sumG2 / count) - mean * mean);
             double std = Math.Sqrt(varG);
 
-            // Limiar adaptativo
-            double threshold = mean + 0.3 * std;
-            threshold = Math.Max(20, Math.Min(240, threshold));
+            // Limiar adaptativo - ajustado para ser mais inclusivo (capturar mais da amostra)
+            // Usar multiplicador menor (0.15 ao invés de 0.3) para incluir mais pixels como amostra
+            double threshold = mean + 0.15 * std;
+            threshold = Math.Max(15, Math.Min(200, threshold)); // Limites mais relaxados
 
             bool[,] bin = new bool[w, h];
             double[,] confidence = new double[w, h];
@@ -212,8 +213,8 @@ namespace HvsMvp.App
                 }
             }
 
-            // Limpeza morfológica por área
-            int minRegionSize = Math.Max(80, (w * h) / 30000);
+            // Limpeza morfológica por área - tamanho mínimo reduzido para manter mais regiões
+            int minRegionSize = Math.Max(50, (w * h) / 50000);
             bool[,] keep = new bool[w, h];
             bool[,] visited = new bool[w, h];
 
