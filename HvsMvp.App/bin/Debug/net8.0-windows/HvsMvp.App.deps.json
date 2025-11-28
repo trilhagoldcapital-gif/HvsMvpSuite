@@ -16,9 +16,6 @@
         }
       },
       "OpenCvSharp4/4.11.0.20250507": {
-        "dependencies": {
-          "System.Memory": "4.6.3"
-        },
         "runtime": {
           "lib/net6.0/OpenCvSharp.dll": {
             "assemblyVersion": "1.0.0.0",
@@ -36,7 +33,7 @@
           "runtimes/win-x64/native/opencv_videoio_ffmpeg4110_64.dll": {
             "rid": "win-x64",
             "assetType": "native",
-            "fileVersion": "2024.12.0.0"
+            "fileVersion": "0.0.0.0"
           },
           "runtimes/win-x86/native/OpenCvSharpExtern.dll": {
             "rid": "win-x86",
@@ -46,11 +43,10 @@
           "runtimes/win-x86/native/opencv_videoio_ffmpeg4110.dll": {
             "rid": "win-x86",
             "assetType": "native",
-            "fileVersion": "2024.12.0.0"
+            "fileVersion": "0.0.0.0"
           }
         }
-      },
-      "System.Memory/4.6.3": {}
+      }
     }
   },
   "libraries": {
@@ -72,13 +68,6 @@
       "sha512": "sha512-3PxMXyzR+pkL9UOx2PiBjZm+/iyCIu5D6OlA1sq9MH7oWrfvVnCXJlUYhIJv67F7SLUwUuGwXDIQBfdsL/54lg==",
       "path": "opencvsharp4.runtime.win/4.11.0.20250507",
       "hashPath": "opencvsharp4.runtime.win.4.11.0.20250507.nupkg.sha512"
-    },
-    "System.Memory/4.6.3": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-qdcDOgnFZY40+Q9876JUHnlHu7bosOHX8XISRoH94fwk6hgaeQGSgfZd8srWRZNt5bV9ZW2TljcegDNxsf+96A==",
-      "path": "system.memory/4.6.3",
-      "hashPath": "system.memory.4.6.3.nupkg.sha512"
     }
   }
 }
