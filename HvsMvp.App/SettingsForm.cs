@@ -43,6 +43,9 @@ namespace HvsMvp.App
         private TextBox _txtOperator = null!;
         private TextBox _txtWhatsAppContact = null!;
 
+        // PR10: Interface tab controls
+        private CheckBox _chkSkipWelcome = null!;
+
         // Paths info
         private Label _lblCurrentPaths = null!;
 
@@ -77,6 +80,7 @@ namespace HvsMvp.App
             CreateAnalysisTab();
             CreateUpdatesTab();
             CreateProfileTab();
+            CreateInterfaceTab();
 
             Controls.Add(_tabControl);
 
@@ -388,6 +392,51 @@ namespace HvsMvp.App
             _tabControl.TabPages.Add(tab);
         }
 
+        /// <summary>
+        /// PR10: Create Interface tab with welcome screen settings.
+        /// </summary>
+        private void CreateInterfaceTab()
+        {
+            var tab = CreateTabPage("Interface");
+
+            int y = 20;
+
+            var lblInterfaceInfo = new Label
+            {
+                Location = new Point(15, y),
+                Size = new Size(500, 30),
+                Text = "Configurações visuais e de comportamento da interface.",
+                ForeColor = Color.FromArgb(180, 190, 210),
+                Font = new Font("Segoe UI", 9)
+            };
+            tab.Controls.Add(lblInterfaceInfo);
+
+            y += 45;
+
+            _chkSkipWelcome = new CheckBox
+            {
+                Location = new Point(15, y),
+                Size = new Size(500, 25),
+                Text = "Pular tela de boas-vindas ao iniciar (modo operador)",
+                ForeColor = Color.Gainsboro
+            };
+            tab.Controls.Add(_chkSkipWelcome);
+
+            y += 35;
+
+            var lblSkipHint = new Label
+            {
+                Location = new Point(35, y),
+                Size = new Size(480, 40),
+                Text = "Quando ativado, a aplicação abre diretamente na janela principal,\npulando a tela de boas-vindas com as opções de início rápido.",
+                ForeColor = Color.FromArgb(150, 160, 180),
+                Font = new Font("Segoe UI", 8)
+            };
+            tab.Controls.Add(lblSkipHint);
+
+            _tabControl.TabPages.Add(tab);
+        }
+
         private Label AddLabel(Control parent, string text, int x, int y)
         {
             var lbl = new Label
@@ -495,6 +544,9 @@ namespace HvsMvp.App
             _txtOperator.Text = _settings.DefaultOperator;
             _txtWhatsAppContact.Text = _settings.WhatsAppContact;
 
+            // PR10: Interface
+            _chkSkipWelcome.Checked = _settings.SkipWelcomeScreen;
+
             UpdateCurrentPathsDisplay();
         }
 
@@ -553,6 +605,9 @@ namespace HvsMvp.App
             _settings.LogoPath = _txtLogoPath.Text;
             _settings.DefaultOperator = _txtOperator.Text;
             _settings.WhatsAppContact = _txtWhatsAppContact.Text;
+
+            // PR10: Interface
+            _settings.SkipWelcomeScreen = _chkSkipWelcome.Checked;
 
             _settings.Save();
 

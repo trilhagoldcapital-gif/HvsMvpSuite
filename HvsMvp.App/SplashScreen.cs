@@ -7,7 +7,7 @@ using System.Windows.Forms;
 namespace HvsMvp.App
 {
     /// <summary>
-    /// PR9: Modernized splash screen with improved visuals.
+    /// PR10: Modernized splash screen with futuristic 3D-style design.
     /// </summary>
     public class SplashScreen : Form
     {
@@ -20,10 +20,16 @@ namespace HvsMvp.App
         private bool _fadingIn = true;
         private bool _fadingOut = false;
 
-        // PR9: Reduced splash time for better UX
-        private const int MinDisplayTimeMs = 3000;
-        private const int MaxDisplayTimeMs = 5000;
-        private const int AnimationIntervalMs = 25;
+        // PR10: Faster splash for better UX
+        private const int MinDisplayTimeMs = 2000;
+        private const int MaxDisplayTimeMs = 4000;
+        private const int AnimationIntervalMs = 20;
+
+        // Color palette
+        private readonly Color _bgColor = Color.FromArgb(8, 14, 24);
+        private readonly Color _goldAccent = Color.FromArgb(200, 160, 60);
+        private readonly Color _textPrimary = Color.FromArgb(230, 235, 245);
+        private readonly Color _textSecondary = Color.FromArgb(150, 165, 185);
 
         public SplashScreen()
         {
@@ -40,27 +46,19 @@ namespace HvsMvp.App
         {
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            Size = new Size(520, 340);
-            BackColor = Color.FromArgb(12, 18, 28);
+            Size = new Size(560, 360);
+            BackColor = _bgColor;
             ShowInTaskbar = false;
             Opacity = 0;
             TopMost = true;
+            DoubleBuffered = true;
 
-            // PR9: Gold accent bar at top (thicker for visual impact)
-            var topBar = new Panel
-            {
-                Location = new Point(0, 0),
-                Size = new Size(520, 4),
-                BackColor = Color.FromArgb(200, 160, 60)
-            };
-            Controls.Add(topBar);
-
-            // PR9: Logo container with rounded appearance effect
+            // Logo container with gold background
             var logoContainer = new Panel
             {
-                Location = new Point(185, 35),
+                Location = new Point(205, 35),
                 Size = new Size(150, 95),
-                BackColor = Color.FromArgb(200, 160, 60)
+                BackColor = _goldAccent
             };
             Controls.Add(logoContainer);
 
@@ -69,7 +67,7 @@ namespace HvsMvp.App
                 Text = "TGC",
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 32, FontStyle.Bold),
+                Font = new Font("Segoe UI", 36, FontStyle.Bold),
                 ForeColor = Color.FromArgb(12, 18, 28),
                 BackColor = Color.Transparent
             };
@@ -80,43 +78,43 @@ namespace HvsMvp.App
             {
                 Text = "TRILHA GOLD CAPITAL",
                 Location = new Point(0, 145),
-                Size = new Size(520, 32),
+                Size = new Size(560, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 15, FontStyle.Bold),
-                ForeColor = Color.FromArgb(200, 160, 60)
+                Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                ForeColor = _goldAccent
             };
             Controls.Add(lblCompany);
 
-            // App name - larger and more prominent
+            // App name
             var lblApp = new Label
             {
                 Text = "TGC Metal Analítico – HVS-MVP",
-                Location = new Point(0, 180),
-                Size = new Size(520, 30),
+                Location = new Point(0, 182),
+                Size = new Size(560, 30),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 14, FontStyle.Regular),
-                ForeColor = Color.WhiteSmoke
+                Font = new Font("Segoe UI", 14),
+                ForeColor = _textPrimary
             };
             Controls.Add(lblApp);
 
             // Subtitle
             var lblSubtitle = new Label
             {
-                Text = "Análise Microscópica de Metais · Cristais · Gemas",
-                Location = new Point(0, 212),
-                Size = new Size(520, 22),
+                Text = "Análise Microscópica · Metais · Cristais · Gemas",
+                Location = new Point(0, 215),
+                Size = new Size(560, 22),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = new Font("Segoe UI", 9),
-                ForeColor = Color.FromArgb(140, 155, 175)
+                Font = new Font("Segoe UI", 9.5f),
+                ForeColor = _textSecondary
             };
             Controls.Add(lblSubtitle);
 
-            // PR9: Progress bar background (wider, more visible)
+            // Progress bar background
             var progressBg = new Panel
             {
-                Location = new Point(60, 260),
+                Location = new Point(80, 265),
                 Size = new Size(400, 8),
-                BackColor = Color.FromArgb(35, 45, 60)
+                BackColor = Color.FromArgb(25, 35, 50)
             };
             Controls.Add(progressBg);
 
@@ -125,19 +123,19 @@ namespace HvsMvp.App
             {
                 Location = new Point(0, 0),
                 Size = new Size(0, 8),
-                BackColor = Color.FromArgb(200, 160, 60)
+                BackColor = _goldAccent
             };
             progressBg.Controls.Add(_progressBar);
 
-            // Status label - more prominent
+            // Status label
             _lblStatus = new Label
             {
                 Text = "Carregando módulos de análise...",
-                Location = new Point(0, 278),
-                Size = new Size(520, 22),
+                Location = new Point(0, 283),
+                Size = new Size(560, 22),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = new Font("Segoe UI", 9),
-                ForeColor = Color.FromArgb(140, 150, 170)
+                ForeColor = _textSecondary
             };
             Controls.Add(_lblStatus);
 
@@ -145,22 +143,40 @@ namespace HvsMvp.App
             var lblVersion = new Label
             {
                 Text = $"v{UpdateService.GetCurrentVersion()}",
-                Location = new Point(0, 310),
-                Size = new Size(520, 18),
+                Location = new Point(0, 320),
+                Size = new Size(560, 18),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.FromArgb(90, 100, 120)
             };
             Controls.Add(lblVersion);
+        }
 
-            // PR9: Gold accent bar at bottom
-            var bottomBar = new Panel
-            {
-                Location = new Point(0, 336),
-                Size = new Size(520, 4),
-                BackColor = Color.FromArgb(200, 160, 60)
-            };
-            Controls.Add(bottomBar);
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            // Background gradient
+            using var bgBrush = new LinearGradientBrush(
+                ClientRectangle,
+                Color.FromArgb(8, 14, 24),
+                Color.FromArgb(12, 22, 36),
+                LinearGradientMode.Vertical);
+            g.FillRectangle(bgBrush, ClientRectangle);
+
+            // Top gold accent bar
+            using var accentBrush = new SolidBrush(_goldAccent);
+            g.FillRectangle(accentBrush, 0, 0, Width, 4);
+
+            // Bottom gold accent bar
+            g.FillRectangle(accentBrush, 0, Height - 4, Width, 4);
+
+            // Subtle border
+            using var borderPen = new Pen(Color.FromArgb(40, 55, 75), 1);
+            g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
         }
 
         public void ShowSplash()
@@ -173,7 +189,7 @@ namespace HvsMvp.App
         public void CloseSplash()
         {
             if (_fadingOut) return;
-            
+
             _closeTimer.Stop();
             _fadingOut = true;
             _fadingIn = false;
@@ -196,7 +212,7 @@ namespace HvsMvp.App
             // Fade in
             if (_fadingIn)
             {
-                _opacity += 0.12;
+                _opacity += 0.15;
                 if (_opacity >= 1.0)
                 {
                     _opacity = 1.0;
@@ -208,7 +224,7 @@ namespace HvsMvp.App
             // Fade out
             if (_fadingOut)
             {
-                _opacity -= 0.1;
+                _opacity -= 0.12;
                 if (_opacity <= 0)
                 {
                     _opacity = 0;
@@ -219,25 +235,27 @@ namespace HvsMvp.App
                 Opacity = _opacity;
             }
 
-            // Progress bar animation - PR9: faster fill to match shorter display time
+            // Progress bar animation - faster fill
             if (!_fadingOut && _progressValue < 400)
             {
-                _progressValue += 4;
+                _progressValue += 6;
                 if (_progressValue > 400) _progressValue = 400;
                 _progressBar.Width = _progressValue;
 
                 // Update status text based on progress
-                if (_progressValue < 80)
+                if (_progressValue < 100)
                     _lblStatus.Text = "Carregando módulos de análise...";
-                else if (_progressValue < 160)
-                    _lblStatus.Text = "Inicializando câmera...";
-                else if (_progressValue < 280)
+                else if (_progressValue < 200)
+                    _lblStatus.Text = "Inicializando serviços de IA...";
+                else if (_progressValue < 300)
                     _lblStatus.Text = "Preparando interface...";
                 else if (_progressValue < 380)
                     _lblStatus.Text = "Carregando configurações HVS...";
                 else
                     _lblStatus.Text = "Pronto!";
             }
+
+            Invalidate(false);
         }
 
         private void CloseTimer_Tick(object? sender, EventArgs e)
@@ -265,15 +283,6 @@ namespace HvsMvp.App
                     // Ignore errors during shutdown
                 }
             });
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-
-            // PR9: Draw subtle border with slight gradient effect
-            using var pen = new Pen(Color.FromArgb(45, 55, 75), 1);
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
