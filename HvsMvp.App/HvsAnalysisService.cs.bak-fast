@@ -1,0 +1,374 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+
+namespace HvsMvp.App
+{
+    public class HvsAnalysisService
+    {
+        private readonly HvsConfig _config;
+        private readonly ImageDiagnosticsService _diagService;
+        private readonly SampleMaskService _maskService;
+
+        public HvsAnalysisService(HvsConfig config)
+        {
+            _config = config;
+            _diagService = new ImageDiagnosticsService();
+            _maskService = new SampleMaskService();
+        }
+
+        public (SampleFullAnalysisResult analysis, SampleMaskClass[,] mask, Bitmap maskPreview)
+            RunFullAnalysis(Bitmap bmp, string? imagePath)
+        {
+            var diagnostics = _diagService.ComputeBasicDiagnostics(bmp);
+            var (mask, maskPreview) = _maskService.BuildMask(bmp);
+
+            var result = new SampleFullAnalysisResult
+            {
+                Id = Guid.NewGuid(),
+                ImagePath = imagePath,
+                Diagnostics = diagnostics,
+                CaptureDateTimeUtc = DateTime.UtcNow
+            };
+
+            RunSimpleColorDetectionFromConfig(bmp, mask, result);
+            AddAllCatalogItemsAsTargets(result);
+
+            result.ShortReport = BuildShortReport(result);
+
+            return (result, mask, maskPreview);
+        }
+
+        private void RunSimpleColorDetectionFromConfig(Bitmap bmp, SampleMaskClass[,] mask, SampleFullAnalysisResult result)
+        {
+            int w = bmp.Width;
+            int h = bmp.Height;
+
+            long totalSamplePixels = 0;
+            var countsById = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+            void IndexMaterials(IEnumerable<HvsMaterial>? list)
+            {
+                if (list == null) return;
+                foreach (var m in list)
+                {
+                    if (!string.IsNullOrWhiteSpace(m.Id) && !countsById.ContainsKey(m.Id))
+                        countsById[m.Id] = 0;
+                }
+            }
+
+            IndexMaterials(_config.Materials?.Metais);
+            IndexMaterials(_config.Materials?.Cristais);
+            IndexMaterials(_config.Materials?.Gemas);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var m = mask[x, y];
+                    if (m == null || !m.IsSample)
+                        continue;
+
+                    totalSamplePixels++;
+
+                    var c = bmp.GetPixel(x, y);
+                    RgbToHsv(c, out double hh, out double ss, out double vv);
+
+                    void TryClassify(IEnumerable<HvsMaterial>? list)
+                    {
+                        if (list == null) return;
+                        foreach (var mat in list)
+                        {
+                            if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                            if (!TryGetHsvRange(mat, out var hRange, out var sRange, out var vRange))
+                                continue;
+
+                            if (IsInRange(hh, hRange) && IsInRange(ss, sRange) && IsInRange(vv, vRange))
+                            {
+                                countsById[mat.Id]++;
+                            }
+                        }
+                    }
+
+                    TryClassify(_config.Materials?.Metais);
+                    TryClassify(_config.Materials?.Cristais);
+                    TryClassify(_config.Materials?.Gemas);
+                }
+            }
+
+            if (totalSamplePixels <= 0) totalSamplePixels = 1;
+
+            void EmitMetals()
+            {
+                var list = _config.Materials?.Metais;
+                if (list == null) return;
+
+                foreach (var mat in list)
+                {
+                    if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                    countsById.TryGetValue(mat.Id, out long ccount);
+                    double pct = (double)ccount / totalSamplePixels;
+
+                    var mr = new MetalResult
+                    {
+                        Id = mat.Id,
+                        Name = mat.Nome ?? mat.Id,
+                        Group = mat.Grupo ?? "",
+                        PctSample = pct,
+                        PpmEstimated = pct > 0 ? PctToPpm(pct) : null,
+                        Score = ComputeBaseScoreForMaterial(mat, pct)
+                    };
+                    result.Metals.Add(mr);
+                }
+            }
+
+            void EmitCrystals()
+            {
+                var list = _config.Materials?.Cristais;
+                if (list == null) return;
+
+                foreach (var mat in list)
+                {
+                    if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                    countsById.TryGetValue(mat.Id, out long ccount);
+                    double pct = (double)ccount / totalSamplePixels;
+
+                    var cr = new CrystalResult
+                    {
+                        Id = mat.Id,
+                        Name = mat.Nome ?? mat.Id,
+                        PctSample = pct,
+                        Score = ComputeBaseScoreForCrystal(mat, pct)
+                    };
+                    result.Crystals.Add(cr);
+                }
+            }
+
+            void EmitGems()
+            {
+                var list = _config.Materials?.Gemas;
+                if (list == null) return;
+
+                foreach (var mat in list)
+                {
+                    if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                    countsById.TryGetValue(mat.Id, out long ccount);
+                    double pct = (double)ccount / totalSamplePixels;
+
+                    var gr = new GemResult
+                    {
+                        Id = mat.Id,
+                        Name = mat.Nome ?? mat.Id,
+                        PctSample = pct,
+                        Score = ComputeBaseScoreForGem(mat, pct)
+                    };
+                    result.Gems.Add(gr);
+                }
+            }
+
+            EmitMetals();
+            EmitCrystals();
+            EmitGems();
+        }
+
+        private void AddAllCatalogItemsAsTargets(SampleFullAnalysisResult result)
+        {
+            var existingMetals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in result.Metals) existingMetals.Add(m.Id);
+
+            if (_config.Materials?.Metais != null)
+            {
+                foreach (var mat in _config.Materials.Metais)
+                {
+                    if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                    if (!existingMetals.Contains(mat.Id))
+                    {
+                        result.Metals.Add(new MetalResult
+                        {
+                            Id = mat.Id,
+                            Name = mat.Nome ?? mat.Id,
+                            Group = mat.Grupo ?? "",
+                            PctSample = 0,
+                            PpmEstimated = null,
+                            Score = 0
+                        });
+                        existingMetals.Add(mat.Id);
+                    }
+                }
+            }
+
+            var existingCrystals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in result.Crystals) existingCrystals.Add(c.Id);
+
+            if (_config.Materials?.Cristais != null)
+            {
+                foreach (var mat in _config.Materials.Cristais)
+                {
+                    if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                    if (!existingCrystals.Contains(mat.Id))
+                    {
+                        result.Crystals.Add(new CrystalResult
+                        {
+                            Id = mat.Id,
+                            Name = mat.Nome ?? mat.Id,
+                            PctSample = 0,
+                            Score = 0
+                        });
+                        existingCrystals.Add(mat.Id);
+                    }
+                }
+            }
+
+            var existingGems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var g in result.Gems) existingGems.Add(g.Id);
+
+            if (_config.Materials?.Gemas != null)
+            {
+                foreach (var mat in _config.Materials.Gemas)
+                {
+                    if (string.IsNullOrWhiteSpace(mat.Id)) continue;
+                    if (!existingGems.Contains(mat.Id))
+                    {
+                        result.Gems.Add(new GemResult
+                        {
+                            Id = mat.Id,
+                            Name = mat.Nome ?? mat.Id,
+                            PctSample = 0,
+                            Score = 0
+                        });
+                        existingGems.Add(mat.Id);
+                    }
+                }
+            }
+        }
+
+        private double PctToPpm(double pctFraction) => pctFraction * 1_000_000.0;
+
+        private double ComputeBaseScoreForMaterial(HvsMaterial mat, double pct)
+        {
+            double baseScore = Math.Min(1.0, pct * 10);
+
+            if (_config.Scoring?.Weights != null)
+            {
+                _config.Scoring.Weights.TryGetValue("optical", out double wOpt);
+                _config.Scoring.Weights.TryGetValue("morfologia", out double wMorph);
+                _config.Scoring.Weights.TryGetValue("textura", out double wTex);
+                _config.Scoring.Weights.TryGetValue("espectral", out double wSpec);
+                double w = wOpt + wMorph + wTex + wSpec;
+                if (w > 0) baseScore *= (w / 1.0);
+            }
+
+            if (_config.Scoring?.Material_Specific_Boosts != null)
+            {
+                foreach (var b in _config.Scoring.Material_Specific_Boosts)
+                {
+                    if (string.Equals(b.Material, mat.Id, StringComparison.OrdinalIgnoreCase))
+                        baseScore += b.Boost;
+                }
+            }
+
+            return Math.Max(0, Math.Min(1.0, baseScore));
+        }
+
+        private double ComputeBaseScoreForCrystal(HvsMaterial mat, double pct)
+        {
+            return Math.Max(0, Math.Min(1.0, pct * 5));
+        }
+
+        private double ComputeBaseScoreForGem(HvsMaterial mat, double pct)
+        {
+            return Math.Max(0, Math.Min(1.0, pct * 8));
+        }
+
+        private bool TryGetHsvRange(HvsMaterial mat, out (double Min, double Max) hRange,
+                                                    out (double Min, double Max) sRange,
+                                                    out (double Min, double Max) vRange)
+        {
+            hRange = (0, 0);
+            sRange = (0, 0);
+            vRange = (0, 0);
+
+            if (mat.Optico == null) return false;
+            if (!mat.Optico.TryGetValue("cor_hsv", out var hsvObj) || hsvObj == null)
+                return false;
+
+            try
+            {
+                var json = JsonSerializer.Serialize(hsvObj);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                hRange = ReadRange(root, "h", 0, 360);
+                sRange = ReadRange(root, "s", 0, 1);
+                vRange = ReadRange(root, "v", 0, 1);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private (double Min, double Max) ReadRange(JsonElement root, string name, double defMin, double defMax)
+        {
+            if (!root.TryGetProperty(name, out var arr) || arr.ValueKind != JsonValueKind.Array)
+                return (defMin, defMax);
+
+            if (arr.GetArrayLength() != 2)
+                return (defMin, defMax);
+
+            double min = arr[0].GetDouble();
+            double max = arr[1].GetDouble();
+            return (min, max);
+        }
+
+        private bool IsInRange(double v, (double Min, double Max) range)
+        {
+            return v >= range.Min && v <= range.Max;
+        }
+
+        private void RgbToHsv(Color c, out double h, out double s, out double v)
+        {
+            int max = Math.Max(c.R, Math.Max(c.G, c.B));
+            int min = Math.Min(c.R, Math.Min(c.G, c.B));
+
+            v = max / 255.0;
+            s = (max == 0) ? 0 : 1d - (1d * min / max);
+            h = c.GetHue();
+        }
+
+        private string BuildShortReport(SampleFullAnalysisResult r)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Resumo rápido da análise");
+            sb.AppendLine("------------------------");
+            sb.AppendLine($"Data/Hora (UTC): {r.CaptureDateTimeUtc:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Foco (0..1): {r.Diagnostics.FocusScore:F2}");
+            sb.AppendLine($"Clipping saturação: {r.Diagnostics.SaturationClippingFraction:P1}");
+            sb.AppendLine($"Fraçao amostra: {r.Diagnostics.ForegroundFraction:P1}");
+            sb.AppendLine();
+            sb.AppendLine("Metais (top 5 por fração de amostra):");
+            foreach (var m in r.Metals.OrderByDescending(m => m.PctSample).Take(5))
+            {
+                var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
+                sb.AppendLine($" - {m.Name} ({m.Id}): {m.PctSample:P3} · {ppm} · score={m.Score:F2}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Cristais (top 3):");
+            foreach (var c in r.Crystals.OrderByDescending(c => c.PctSample).Take(3))
+            {
+                sb.AppendLine($" - {c.Name}: {c.PctSample:P3} · score={c.Score:F2}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("Gemas (top 3):");
+            foreach (var g in r.Gems.OrderByDescending(g => g.PctSample).Take(3))
+            {
+                sb.AppendLine($" - {g.Name}: {g.PctSample:P3} · score={g.Score:F2}");
+            }
+            return sb.ToString();
+        }
+    }
+}

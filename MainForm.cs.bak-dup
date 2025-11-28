@@ -1,0 +1,1026 @@
+﻿using System;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace HvsMvp.App
+{
+    public class MainForm : Form
+    {
+        private HvsConfig _config;
+        private HvsAnalysisService _analysisService;
+        private SampleFullAnalysisResult _lastAnalysisResult;
+
+        // Layout / UI
+        private Panel _topContainer;
+        private FlowLayoutPanel _toolbarRow1;
+        private FlowLayoutPanel _toolbarRow2;
+        private Panel _headerBar;
+        private Label _lblTitle;
+        private Button _btnLanguage;
+        private ContextMenuStrip _languageMenu;
+
+        private SplitContainer _mainVerticalSplit;
+        private SplitContainer _contentVerticalSplit;
+        private SplitContainer _cameraMaterialsSplit;
+
+        private Panel _imagePanel;
+        private PictureBox _pictureSample;
+
+        private Panel _rightPanel;
+        private TableLayoutPanel _materialsLayout;
+        private Label _lblMetalsHeader;
+        private Label _lblCrystalsHeader;
+        private Label _lblGemsHeader;
+        private ListBox _listMetals;
+        private ListBox _listCrystals;
+        private ListBox _listGems;
+
+        private ComboBox _cbTarget;
+        private Button _btnSelectiveAnalyze;
+
+        private TextBox _txtDetails;
+        private Panel _footerPanel;
+        private Label _lblStatus;
+
+        private readonly ToolTip _hvsToolTip =
+            new ToolTip { IsBalloon = false, UseAnimation = true, UseFading = true, AutoPopDelay = 1500 };
+
+        // Câmera
+        private readonly MicroscopeCameraService _microscopeCamera = new MicroscopeCameraService();
+        private bool _liveRunning;
+        private int _cameraIndex = 0;
+        private int _cameraWidth = 1280;
+        private int _cameraHeight = 720;
+
+        // Zoom
+        private float _zoomFactor = 1.0f;
+
+        // Análise contínua
+        private ContinuousAnalysisController _continuousController;
+        private bool _continuousRunning;
+
+        public MainForm()
+        {
+            Text = "TGC Metal Analítico – HVS-MVP";
+            StartPosition = FormStartPosition.CenterScreen;
+            WindowState = FormWindowState.Maximized;
+            MinimumSize = new Size(1280, 720);
+            BackColor = Color.FromArgb(5, 10, 20);
+
+            LoadHvsConfig();
+            InitializeLayout();
+            InitializeCameraEvents();
+            PopulateMaterials();
+
+            FormClosing += MainForm_FormClosing;
+        }
+
+        #region Config
+        private void LoadHvsConfig()
+        {
+            try
+            {
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hvs-config.json");
+                if (!File.Exists(path))
+                {
+                    MessageBox.Show(this, "hvs-config.json não encontrado em:\n" + path,
+                        "Config", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                string json = File.ReadAllText(path);
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                _config = JsonSerializer.Deserialize<HvsConfig>(json, opts);
+
+                if (_config?.App != null && !string.IsNullOrWhiteSpace(_config.App.Name))
+                    Text = _config.App.Name + " · " + (_config.App.Version ?? "v1.0");
+
+                if (_config != null)
+                    _analysisService = new HvsAnalysisService(_config);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Erro ao carregar config:\n" + ex, "Config", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        #endregion
+
+        #region Layout
+        private void InitializeLayout()
+        {
+            _topContainer = new Panel { Dock = DockStyle.Top, Height = 150, BackColor = Color.FromArgb(8, 16, 28) };
+            Controls.Add(_topContainer);
+
+            var topLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 38));
+            topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 24));
+            _topContainer.Controls.Add(topLayout);
+
+            var toolbarPanel1 = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(12, 24, 40), Padding = new Padding(6, 4, 6, 2) };
+            var toolbarPanel2 = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(12, 24, 40), Padding = new Padding(6, 0, 6, 2) };
+            var headerPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(200, 160, 60), Padding = new Padding(16, 4, 16, 4) };
+
+            topLayout.Controls.Add(toolbarPanel1, 0, 0);
+            topLayout.Controls.Add(toolbarPanel2, 0, 1);
+            topLayout.Controls.Add(headerPanel, 0, 2);
+
+            _toolbarRow1 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = true
+            };
+            toolbarPanel1.Controls.Add(_toolbarRow1);
+
+            _toolbarRow2 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = true
+            };
+            toolbarPanel2.Controls.Add(_toolbarRow2);
+
+            var headerLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            headerPanel.Controls.Add(headerLayout);
+
+            _lblTitle = new Label
+            {
+                Text = "TGC Metal Analítico · HVS",
+                AutoSize = true,
+                ForeColor = Color.FromArgb(20, 20, 30),
+                Font = new Font("Segoe UI", 11, FontStyle.Bold)
+            };
+            headerLayout.Controls.Add(_lblTitle, 0, 0);
+
+            _languageMenu = new ContextMenuStrip();
+            AddLanguageItem("Português (pt-BR)", "pt-BR");
+            AddLanguageItem("English (en-US)", "en-US");
+            AddLanguageItem("Español (es-ES)", "es-ES");
+            AddLanguageItem("Français (fr-FR)", "fr-FR");
+            AddLanguageItem("Deutsch (de-DE)", "de-DE");
+            AddLanguageItem("Italiano (it-IT)", "it-IT");
+            AddLanguageItem("العربية (ar)", "ar");
+            AddLanguageItem("中文 (zh-CN)", "zh-CN");
+            AddLanguageItem("日本語 (ja-JP)", "ja-JP");
+            AddLanguageItem("한국어 (ko-KR)", "ko-KR");
+            AddLanguageItem("Русский (ru-RU)", "ru-RU");
+
+            _btnLanguage = new Button
+            {
+                Text = "Idioma ▾",
+                Size = new Size(130, 26),
+                BackColor = Color.FromArgb(40, 40, 60),
+                ForeColor = Color.WhiteSmoke,
+                FlatStyle = FlatStyle.Flat
+            };
+            _btnLanguage.Click += BtnLanguage_Click;
+            headerLayout.Controls.Add(_btnLanguage, 1, 0);
+
+            Button Cmd(string text)
+            {
+                var b = new Button
+                {
+                    Text = text,
+                    AutoSize = true,
+                    Height = 26,
+                    Margin = new Padding(4, 2, 4, 2),
+                    Padding = new Padding(8, 2, 8, 2),
+                    BackColor = Color.FromArgb(20, 40, 65),
+                    ForeColor = Color.WhiteSmoke,
+                    FlatStyle = FlatStyle.Flat
+                };
+                b.FlatAppearance.BorderColor = Color.FromArgb(60, 80, 110);
+                b.FlatAppearance.BorderSize = 1;
+                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(30, 60, 95);
+                b.FlatAppearance.MouseDownBackColor = Color.FromArgb(40, 80, 120);
+                return b;
+            }
+
+            // Linha 1
+            var btnOpen = Cmd("📂 Abrir");
+            btnOpen.Click += BtnOpenImage_Click;
+            _toolbarRow1.Controls.Add(btnOpen);
+
+            var btnLive = Cmd("▶ Live");
+            btnLive.Click += BtnLive_Click;
+            _toolbarRow1.Controls.Add(btnLive);
+
+            var btnStopLive = Cmd("⏹ Parar Live");
+            btnStopLive.Click += BtnParar_Click;
+            _toolbarRow1.Controls.Add(btnStopLive);
+
+            var btnAnalyze = Cmd("🧪 Analisar");
+            btnAnalyze.Click += BtnAnalisar_Click;
+            _toolbarRow1.Controls.Add(btnAnalyze);
+
+            var btnContinuous = Cmd("⚙ Contínuo");
+            btnContinuous.Click += BtnContinuous_Click;
+            _toolbarRow1.Controls.Add(btnContinuous);
+
+            var btnStopContinuous = Cmd("⏸ Parar contínuo");
+            btnStopContinuous.Click += BtnStopContinuous_Click;
+            _toolbarRow1.Controls.Add(btnStopContinuous);
+
+            var lblAlvo = new Label { Text = "Alvo:", AutoSize = true, ForeColor = Color.Gainsboro, Margin = new Padding(10, 8, 2, 0) };
+            _toolbarRow1.Controls.Add(lblAlvo);
+
+            _cbTarget = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 180,
+                BackColor = Color.FromArgb(32, 32, 44),
+                ForeColor = Color.White
+            };
+            _toolbarRow1.Controls.Add(_cbTarget);
+
+            _btnSelectiveAnalyze = Cmd("🎯 Seletiva");
+            _btnSelectiveAnalyze.Click += BtnSelectiveAnalyze_Click;
+            _toolbarRow1.Controls.Add(_btnSelectiveAnalyze);
+
+            var btnMask = Cmd("🎨 Máscara");
+            btnMask.Click += BtnMascara_Click;
+            _toolbarRow1.Controls.Add(btnMask);
+
+            var btnFundoMask = Cmd("🖼 Fundo");
+            btnFundoMask.Click += BtnFundoMasc_Click;
+            _toolbarRow1.Controls.Add(btnFundoMask);
+
+            // Linha 2
+            var btnZoomIn = Cmd("🔍 Zoom +");
+            btnZoomIn.Click += BtnZoomMais_Click;
+            _toolbarRow2.Controls.Add(btnZoomIn);
+
+            var btnZoomOut = Cmd("🔎 Zoom -");
+            btnZoomOut.Click += BtnZoomMenos_Click;
+            _toolbarRow2.Controls.Add(btnZoomOut);
+
+            var btnWB = Cmd("⚪ WB");
+            btnWB.Click += BtnBalanco_Click;
+            _toolbarRow2.Controls.Add(btnWB);
+
+            var btnScale = Cmd("📏 Escala");
+            btnScale.Click += BtnEscala_Click;
+            _toolbarRow2.Controls.Add(btnScale);
+
+            var btnCamera = Cmd("🎥 Câmera");
+            btnCamera.Click += BtnSelecionarCamera_Click;
+            _toolbarRow2.Controls.Add(btnCamera);
+
+            var btnRes = Cmd("⚙ Resolução");
+            btnRes.Click += BtnSelecionarResolucao_Click;
+            _toolbarRow2.Controls.Add(btnRes);
+
+            var btnDebug = Cmd("🛠 Debug");
+            btnDebug.Click += BtnDebugHvs_Click;
+            _toolbarRow2.Controls.Add(btnDebug);
+
+            var btnCalib = Cmd("📸 Calibrar");
+            btnCalib.Click += BtnCalibrarAuto_Click;
+            _toolbarRow2.Controls.Add(btnCalib);
+
+            var btnTxt = Cmd("📝 TXT");
+            btnTxt.Click += BtnTxt_Click;
+            _toolbarRow2.Controls.Add(btnTxt);
+
+            var btnJson = Cmd("{} JSON");
+            btnJson.Click += BtnJson_Click;
+            _toolbarRow2.Controls.Add(btnJson);
+
+            var btnCsv = Cmd("📊 CSV");
+            btnCsv.Click += BtnCsv_Click;
+            _toolbarRow2.Controls.Add(btnCsv);
+
+            var btnParticles = Cmd("🔬 Partículas");
+            btnParticles.Click += BtnParticulas_Click;
+            _toolbarRow2.Controls.Add(btnParticles);
+
+            // Split principal
+            _mainVerticalSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6 };
+            Controls.Add(_mainVerticalSplit);
+            Controls.Remove(_topContainer);
+            _mainVerticalSplit.Panel1.Controls.Add(_topContainer);
+            _topContainer.Dock = DockStyle.Fill;
+
+            _contentVerticalSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6 };
+            _mainVerticalSplit.Panel2.Controls.Add(_contentVerticalSplit);
+
+            _cameraMaterialsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterWidth = 6 };
+            _contentVerticalSplit.Panel1.Controls.Add(_cameraMaterialsSplit);
+
+            _imagePanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = new Padding(8), AutoScroll = true };
+            _cameraMaterialsSplit.Panel1.Controls.Add(_imagePanel);
+
+            _pictureSample = new PictureBox { BackColor = Color.Black, SizeMode = PictureBoxSizeMode.Normal, Location = new Point(0, 0) };
+            _pictureSample.MouseMove += PictureSample_MouseMove;
+            _imagePanel.Controls.Add(_pictureSample);
+
+            _rightPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(8, 18, 30), Padding = new Padding(8) };
+            _cameraMaterialsSplit.Panel2.Controls.Add(_rightPanel);
+
+            _materialsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            _materialsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            _materialsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            _rightPanel.Controls.Add(_materialsLayout);
+
+            var matHeader = new Panel { Dock = DockStyle.Top, Height = 22 };
+            _materialsLayout.Controls.Add(matHeader, 0, 0);
+            var lblMatTitle = new Label
+            {
+                Text = "Metais / Cristais / Gemas",
+                AutoSize = true,
+                ForeColor = Color.FromArgb(210, 220, 235),
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                Location = new Point(2, 3)
+            };
+            matHeader.Controls.Add(lblMatTitle);
+
+            var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
+            columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f));
+            _materialsLayout.Controls.Add(columns, 0, 1);
+
+            (Panel colPanel, Label header, ListBox list) CreateColumn(string headerText)
+            {
+                var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 2, 4, 2) };
+                var hdr = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 18,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.FromArgb(220, 230, 245),
+                    Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                    Text = headerText
+                };
+                var lb = new ListBox
+                {
+                    Dock = DockStyle.Fill,
+                    BackColor = Color.FromArgb(12, 24, 36),
+                    ForeColor = Color.WhiteSmoke,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Segoe UI", 8)
+                };
+                panel.Controls.Add(lb);
+                panel.Controls.Add(hdr);
+                return (panel, hdr, lb);
+            }
+
+            var colMet = CreateColumn("Metais (0)");
+            _lblMetalsHeader = colMet.header;
+            _listMetals = colMet.list;
+            columns.Controls.Add(colMet.colPanel, 0, 0);
+
+            var colCr = CreateColumn("Cristais (0)");
+            _lblCrystalsHeader = colCr.header;
+            _listCrystals = colCr.list;
+            columns.Controls.Add(colCr.colPanel, 1, 0);
+
+            var colGe = CreateColumn("Gemas (0)");
+            _lblGemsHeader = colGe.header;
+            _listGems = colGe.list;
+            columns.Controls.Add(colGe.colPanel, 2, 0);
+
+            _listMetals.SelectedIndexChanged += (s, e) => ShowMaterialDetails(_listMetals.SelectedItem as HvsMaterial);
+            _listCrystals.SelectedIndexChanged += (s, e) => ShowMaterialDetails(_listCrystals.SelectedItem as HvsMaterial);
+            _listGems.SelectedIndexChanged += (s, e) => ShowMaterialDetails(_listGems.SelectedItem as HvsMaterial);
+
+            _txtDetails = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                Multiline = true,
+                ReadOnly = true,
+                BackColor = Color.FromArgb(6, 14, 24),
+                ForeColor = Color.Gainsboro,
+                BorderStyle = BorderStyle.None,
+                ScrollBars = ScrollBars.Vertical,
+                Font = new Font("Consolas", 9)
+            };
+            _contentVerticalSplit.Panel2.Controls.Add(_txtDetails);
+
+            _footerPanel = new Panel { Dock = DockStyle.Bottom, Height = 24, BackColor = Color.FromArgb(8, 18, 30), Padding = new Padding(8, 2, 8, 2) };
+            Controls.Add(_footerPanel);
+            _lblStatus = new Label
+            {
+                Text = "Pronto",
+                ForeColor = Color.FromArgb(170, 185, 210),
+                Dock = DockStyle.Left,
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            _footerPanel.Controls.Add(_lblStatus);
+        }
+        #endregion
+
+        #region Camera Events
+        private void InitializeCameraEvents()
+        {
+            _microscopeCamera.FrameReceived += frame =>
+            {
+                try
+                {
+                    if (!IsHandleCreated) { frame.Dispose(); return; }
+                    BeginInvoke((Action)(() =>
+                    {
+                        try
+                        {
+                            var old = _pictureSample.Image;
+                            _pictureSample.Image = (Bitmap)frame.Clone();
+                            old?.Dispose();
+                            if (_continuousRunning == false) ApplyZoom();
+                        }
+                        finally { frame.Dispose(); }
+                    }));
+                }
+                catch
+                {
+                    frame.Dispose();
+                }
+            };
+        }
+        #endregion
+
+        #region Continuous Analysis
+        private void BtnContinuous_Click(object sender, EventArgs e)
+        {
+            if (_continuousRunning)
+            {
+                AppendLog("Já em modo contínuo.");
+                return;
+            }
+            if (_analysisService == null)
+            {
+                AppendLog("Serviço de análise indisponível.");
+                return;
+            }
+
+            _continuousController = new ContinuousAnalysisController(
+                frameProvider: () => SafeGetCurrentFrameClone(),
+                analyzer: bmp => _analysisService.RunFullAnalysis(bmp, null),
+                intervalMs: 800);
+
+            _continuousController.AnalysisCompleted += OnContinuousAnalysis;
+            _continuousController.Start();
+            _continuousRunning = true;
+            _lblStatus.Text = "Análise contínua ativa";
+            AppendLog("Modo contínuo iniciado.");
+        }
+
+        private void BtnStopContinuous_Click(object sender, EventArgs e)
+        {
+            StopContinuousAnalysis();
+        }
+
+        private void StopContinuousAnalysis()
+        {
+            if (!_continuousRunning) return;
+            try
+            {
+                _continuousController?.Stop();
+                _continuousController = null;
+                _continuousRunning = false;
+                _lblStatus.Text = "Modo contínuo parado";
+                AppendLog("Modo contínuo encerrado.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro parar contínuo: " + ex.Message);
+            }
+        }
+
+        private Bitmap SafeGetCurrentFrameClone()
+        {
+            if (_pictureSample.Image == null) return null;
+            try
+            {
+                return (Bitmap)_pictureSample.Image.Clone();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void OnContinuousAnalysis(SampleFullAnalysisResult result)
+        {
+            if (result == null) return;
+            _lastAnalysisResult = result;
+            UpdateMaterialListsFromAnalysis(false); // não limpar todas as caixas
+            _lblStatus.Text = "Contínuo: foco=" + result.Diagnostics.FocusScore.ToString("F2");
+        }
+        #endregion
+
+        #region Button Handlers (Live / Single Analysis / Calibration)
+        private void BtnLive_Click(object sender, EventArgs e)
+        {
+            if (_liveRunning)
+            {
+                AppendLog("Live já está ativo.");
+                return;
+            }
+            try
+            {
+                _microscopeCamera.DeviceIndex = _cameraIndex;
+                _microscopeCamera.Width = _cameraWidth;
+                _microscopeCamera.Height = _cameraHeight;
+                _microscopeCamera.Start();
+                _liveRunning = true;
+                AppendLog("Live câmera iniciado.");
+                _lblStatus.Text = "Live ativo";
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Falha ao iniciar live: " + ex.Message);
+                _liveRunning = false;
+            }
+        }
+
+        private void BtnParar_Click(object sender, EventArgs e)
+        {
+            if (!_liveRunning)
+            {
+                AppendLog("Live não está ativo.");
+                return;
+            }
+            try
+            {
+                _microscopeCamera.Stop();
+                _liveRunning = false;
+                AppendLog("Live parado.");
+                _lblStatus.Text = "Live parado";
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro ao parar live: " + ex.Message);
+            }
+        }
+
+        private void BtnAnalisar_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_analysisService == null) { AppendLog("Serviço análise não inicializado."); return; }
+                if (_pictureSample.Image == null) { AppendLog("Sem imagem para análise."); return; }
+
+                using (var bmp = new Bitmap(_pictureSample.Image))
+                {
+                    var (analysis, mask, maskPreview) = _analysisService.RunFullAnalysis(bmp, null);
+                    _lastAnalysisResult = analysis;
+                    _txtDetails.Text = analysis.ShortReport;
+                    UpdateMaterialListsFromAnalysis(true);
+                    AppendLog("Análise concluída.");
+                    _lblStatus.Text = "Análise única concluída";
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro análise: " + ex.Message);
+            }
+        }
+
+        private void BtnCalibrarAuto_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_analysisService == null || _pictureSample.Image == null) { AppendLog("Sem serviço ou imagem."); return; }
+                using (var bmp = new Bitmap(_pictureSample.Image))
+                {
+                    var (analysis, mask, maskPreview) = _analysisService.RunFullAnalysis(bmp, null);
+                    _lastAnalysisResult = analysis;
+
+                    string alvo = (_cbTarget.SelectedItem != null) ? _cbTarget.SelectedItem.ToString() : "SemAlvo";
+                    alvo = alvo.Replace(':', '_').Replace(' ', '_');
+
+                    string baseDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "datasets", "hvs-calibration", alvo);
+                    Directory.CreateDirectory(baseDir);
+                    string ts = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+                    string imgPath = Path.Combine(baseDir, "snapshot_" + ts + ".png");
+                    string maskPath = Path.Combine(baseDir, "mask_" + ts + ".png");
+                    bmp.Save(imgPath, System.Drawing.Imaging.ImageFormat.Png);
+                    maskPreview.Save(maskPath, System.Drawing.Imaging.ImageFormat.Png);
+
+                    var laudo = new
+                    {
+                        id = analysis.Id,
+                        utc = analysis.CaptureDateTimeUtc.ToString("o"),
+                        alvo = alvo,
+                        diagnostics = new
+                        {
+                            focus = analysis.Diagnostics.FocusScore,
+                            clipping = analysis.Diagnostics.SaturationClippingFraction,
+                            foreground = analysis.Diagnostics.ForegroundFraction
+                        },
+                        metals = analysis.Metals.Select(m => new { m.Id, m.Name, m.Group, m.PctSample, m.PpmEstimated, m.Score })
+                    };
+                    File.WriteAllText(Path.Combine(baseDir, "laudo_" + ts + ".json"),
+                        JsonSerializer.Serialize(laudo, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+
+                    UpdateMaterialListsFromAnalysis(false);
+                    AppendLog("Calibração automática salva: " + baseDir);
+                    _lblStatus.Text = "Calibração auto concluída";
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro calibração: " + ex.Message);
+            }
+        }
+        #endregion
+
+        #region Export
+        private void BtnTxt_Click(object sender, EventArgs e)
+        {
+            if (_lastAnalysisResult == null) { AppendLog("Nenhum resultado para TXT."); return; }
+            string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".txt");
+            File.WriteAllText(path, _lastAnalysisResult.ShortReport, Encoding.UTF8);
+            AppendLog("Exportado TXT: " + path);
+        }
+
+        private void BtnJson_Click(object sender, EventArgs e)
+        {
+            if (_lastAnalysisResult == null) { AppendLog("Nenhum resultado para JSON."); return; }
+            string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+            Directory.CreateDirectory(dir);
+
+            var obj = new
+            {
+                id = _lastAnalysisResult.Id,
+                utc = _lastAnalysisResult.CaptureDateTimeUtc.ToString("o"),
+                diagnostics = _lastAnalysisResult.Diagnostics,
+                metals = _lastAnalysisResult.Metals,
+                crystals = _lastAnalysisResult.Crystals,
+                gems = _lastAnalysisResult.Gems
+            };
+            string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".json");
+            File.WriteAllText(path, JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true }), Encoding.UTF8);
+            AppendLog("Exportado JSON: " + path);
+        }
+
+        private void BtnCsv_Click(object sender, EventArgs e)
+        {
+            if (_lastAnalysisResult == null) { AppendLog("Nenhum resultado para CSV."); return; }
+            string dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+            Directory.CreateDirectory(dir);
+            var sb = new StringBuilder();
+            sb.AppendLine("Tipo,Id,Nome,Grupo,PctSample,PPM,Score");
+            foreach (var m in _lastAnalysisResult.Metals)
+                sb.AppendLine("Metal," + m.Id + "," + m.Name + "," + m.Group + "," +
+                              m.PctSample.ToString("F6") + "," + (m.PpmEstimated.HasValue ? m.PpmEstimated.Value.ToString("F1") : "") + "," + m.Score.ToString("F4"));
+            foreach (var c in _lastAnalysisResult.Crystals)
+                sb.AppendLine("Cristal," + c.Id + "," + c.Name + ",," + c.PctSample.ToString("F6") + ",," + c.Score.ToString("F4"));
+            foreach (var g in _lastAnalysisResult.Gems)
+                sb.AppendLine("Gema," + g.Id + "," + g.Name + ",," + g.PctSample.ToString("F6") + ",," + g.Score.ToString("F4"));
+
+            string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".csv");
+            File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+            AppendLog("Exportado CSV: " + path);
+        }
+        #endregion
+
+        #region White Balance / Zoom / Misc
+        private void BtnBalanco_Click(object sender, EventArgs e)
+        {
+            if (_pictureSample.Image == null)
+            {
+                AppendLog("Sem imagem para WB.");
+                return;
+            }
+            try
+            {
+                using (var src = new Bitmap(_pictureSample.Image))
+                {
+                    var balanced = ApplySimpleWhiteBalance(src);
+                    _pictureSample.Image?.Dispose();
+                    _pictureSample.Image = (Bitmap)balanced.Clone();
+                }
+                AppendLog("White Balance aplicado.");
+                ApplyZoom();
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro WB: " + ex.Message);
+            }
+        }
+
+        private Bitmap ApplySimpleWhiteBalance(Bitmap bmp)
+        {
+            var clone = new Bitmap(bmp.Width, bmp.Height);
+            using (var g = Graphics.FromImage(clone))
+                g.DrawImage(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height));
+
+            long rSum = 0, gSum = 0, bSum = 0;
+            int total = bmp.Width * bmp.Height;
+            for (int y = 0; y < bmp.Height; y++)
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    var c = bmp.GetPixel(x, y);
+                    rSum += c.R; gSum += c.G; bSum += c.B;
+                }
+            double rAvg = rSum / (double)total;
+            double gAvg = gSum / (double)total;
+            double bAvg = bSum / (double)total;
+            double target = (rAvg + gAvg + bAvg) / 3.0;
+            double rGain = target / (rAvg == 0 ? 1 : rAvg);
+            double gGain = target / (gAvg == 0 ? 1 : gAvg);
+            double bGain = target / (bAvg == 0 ? 1 : bAvg);
+
+            for (int y = 0; y < clone.Height; y++)
+                for (int x = 0; x < clone.Width; x++)
+                {
+                    var c = clone.GetPixel(x, y);
+                    int r = (int)Math.Min(255, c.R * rGain);
+                    int g2 = (int)Math.Min(255, c.G * gGain);
+                    int b2 = (int)Math.Min(255, c.B * bGain);
+                    clone.SetPixel(x, y, Color.FromArgb(r, g2, b2));
+                }
+            return clone;
+        }
+
+        private void BtnZoomMais_Click(object sender, EventArgs e)
+        {
+            _zoomFactor = Math.Min(8f, _zoomFactor * 1.25f);
+            ApplyZoom();
+        }
+
+        private void BtnZoomMenos_Click(object sender, EventArgs e)
+        {
+            _zoomFactor = Math.Max(0.125f, _zoomFactor / 1.25f);
+            ApplyZoom();
+        }
+
+        private void ApplyZoom()
+        {
+            if (_pictureSample.Image == null) return;
+            var img = _pictureSample.Image;
+            int newW = (int)(img.Width * _zoomFactor);
+            int newH = (int)(img.Height * _zoomFactor);
+            _pictureSample.SizeMode = PictureBoxSizeMode.Normal;
+            _pictureSample.Size = new Size(newW, newH);
+            _imagePanel.AutoScrollMinSize = _pictureSample.Size;
+            if (newW < _imagePanel.ClientSize.Width && newH < _imagePanel.ClientSize.Height)
+            {
+                _pictureSample.Location = new Point(
+                    (_imagePanel.ClientSize.Width - newW) / 2,
+                    (_imagePanel.ClientSize.Height - newH) / 2
+                );
+            }
+            else
+            {
+                _pictureSample.Location = new Point(0, 0);
+            }
+        }
+        #endregion
+
+        #region Seleção de Câmera / Resolução
+        private void BtnSelecionarCamera_Click(object sender, EventArgs e)
+        {
+            using (var form = new Form { Text = "Selecionar câmera", Size = new Size(400, 160), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog })
+            {
+                var lbl = new Label { Text = "Índice (0..3):", AutoSize = true, Location = new Point(12, 15) };
+                var combo = new ComboBox { Location = new Point(15, 40), Width = 80, DropDownStyle = ComboBoxStyle.DropDownList };
+                for (int i = 0; i < 4; i++) combo.Items.Add(i);
+                combo.SelectedItem = _cameraIndex;
+                var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(220, 80), Width = 70 };
+                var btnCancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Location = new Point(300, 80), Width = 70 };
+                form.Controls.Add(lbl); form.Controls.Add(combo); form.Controls.Add(btnOk); form.Controls.Add(btnCancel);
+                form.AcceptButton = btnOk; form.CancelButton = btnCancel;
+                if (form.ShowDialog(this) == DialogResult.OK && combo.SelectedItem is int idx)
+                {
+                    _cameraIndex = idx;
+                    AppendLog("Câmera selecionada: índice " + _cameraIndex);
+                }
+            }
+        }
+
+        private void BtnSelecionarResolucao_Click(object sender, EventArgs e)
+        {
+            using (var form = new Form { Text = "Selecionar resolução", Size = new Size(420, 220), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog })
+            {
+                var lbl = new Label { Text = "Resolução:", AutoSize = true, Location = new Point(12, 15) };
+                var combo = new ComboBox { Location = new Point(15, 40), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+                string[] presets = { "640x480", "800x600", "1280x720", "1920x1080" };
+                foreach (var p in presets) combo.Items.Add(p);
+                string atual = $"{_cameraWidth}x{_cameraHeight}";
+                combo.SelectedItem = presets.Contains(atual) ? atual : "1280x720";
+                var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(220, 150), Width = 70 };
+                var btnCancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Location = new Point(300, 150), Width = 70 };
+                form.Controls.Add(lbl); form.Controls.Add(combo); form.Controls.Add(btnOk); form.Controls.Add(btnCancel);
+                form.AcceptButton = btnOk; form.CancelButton = btnCancel;
+                if (form.ShowDialog(this) == DialogResult.OK && combo.SelectedItem is string sel)
+                {
+                    var parts = sel.Split('x');
+                    if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
+                    {
+                        _cameraWidth = w; _cameraHeight = h;
+                        AppendLog("Resolução selecionada: " + _cameraWidth + "x" + _cameraHeight);
+                    }
+                }
+            }
+        }
+        #endregion
+
+        #region Outros Botões Placeholder
+        private void BtnMascara_Click(object sender, EventArgs e) => AppendLog("Máscara (placeholder).");
+        private void BtnFundoMasc_Click(object sender, EventArgs e) => AppendLog("Fundo mascarado (placeholder).");
+        private void BtnParticulas_Click(object sender, EventArgs e) => AppendLog("Partículas / Dataset IA (placeholder).");
+        private void BtnEscala_Click(object sender, EventArgs e) => AppendLog("Escala (placeholder).");
+        #endregion
+
+        #region Debug / Seletiva / Tooltip
+        private void BtnDebugHvs_Click(object sender, EventArgs e)
+        {
+            if (_config == null || _config.Materials == null)
+            {
+                AppendLog("Config ausente.");
+                return;
+            }
+            int mH = 0;
+            if (_config.Materials.Metais != null)
+                foreach (var m in _config.Materials.Metais)
+                    if (TryGetHsvRange(m, out _, out _, out _)) mH++;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("DEBUG HVS");
+            sb.AppendLine("Metais com faixas HSV: " + mH);
+            _txtDetails.Text = sb.ToString();
+            AppendLog("Debug concluído.");
+        }
+
+        private void BtnSelectiveAnalyze_Click(object sender, EventArgs e)
+        {
+            if (_lastAnalysisResult == null)
+            {
+                AppendLog("Sem análise anterior.");
+                return;
+            }
+            if (_cbTarget.SelectedItem == null)
+            {
+                AppendLog("Nenhum alvo selecionado.");
+                return;
+            }
+            string alvo = _cbTarget.SelectedItem.ToString();
+            var sb = new StringBuilder();
+            sb.AppendLine("Análise seletiva – " + alvo);
+            sb.AppendLine("--------------------------------");
+
+            if (alvo.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
+            {
+                string name = alvo.Substring("Metal:".Length).Trim();
+                var m = _lastAnalysisResult.Metals.FirstOrDefault(x =>
+                    x.Name.Equals(name, StringComparison.OrdinalIgnoreCase) ||
+                    x.Id.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (m != null)
+                {
+                    string ppm = m.PpmEstimated.HasValue ? m.PpmEstimated.Value.ToString("F1") + " ppm" : "-";
+                    sb.AppendLine("ID: " + m.Id);
+                    sb.AppendLine("Nome: " + m.Name);
+                    sb.AppendLine("Grupo: " + m.Group);
+                    sb.AppendLine("Fração: " + m.PctSample.ToString("P4"));
+                    sb.AppendLine("PPM estimado: " + ppm);
+                    sb.AppendLine("Score: " + m.Score.ToString("F3"));
+                }
+                else sb.AppendLine("Nenhum resultado para esse metal.");
+            }
+
+            _txtDetails.Text = sb.ToString();
+        }
+
+        private void PictureSample_MouseMove(object sender, MouseEventArgs e)
+        {
+            // Pode adicionar detector refinado depois (desativado para performance contínua).
+        }
+        #endregion
+
+        #region Materiais / HSV Helpers
+        private void PopulateMaterials()
+        {
+            if (_config == null || _config.Materials == null) return;
+            _listMetals.Items.Clear();
+            _cbTarget.Items.Clear();
+
+            if (_config.Materials.Metais != null)
+            {
+                foreach (var m in _config.Materials.Metais)
+                {
+                    _listMetals.Items.Add(m);
+                    string nome = !string.IsNullOrWhiteSpace(m.Nome) ? m.Nome : m.Id;
+                    if (!string.IsNullOrWhiteSpace(nome))
+                        _cbTarget.Items.Add("Metal: " + nome);
+                }
+            }
+            if (_cbTarget.Items.Count > 0) _cbTarget.SelectedIndex = 0;
+
+            _lblMetalsHeader.Text = "Metais (" + _listMetals.Items.Count + ")";
+            _lblCrystalsHeader.Text = "Cristais (0)";
+            _lblGemsHeader.Text = "Gemas (0)";
+        }
+
+        private void UpdateMaterialListsFromAnalysis(bool replaceDetails)
+        {
+            try
+            {
+                if (_lastAnalysisResult == null) return;
+
+                _listMetals.BeginUpdate();
+                _listMetals.Items.Clear();
+                foreach (var m in _lastAnalysisResult.Metals.OrderByDescending(x => x.PctSample))
+                {
+                    string ppm = m.PpmEstimated.HasValue ? m.PpmEstimated.Value.ToString("F1") + " ppm" : "-";
+                    _listMetals.Items.Add(m.Name + " (" + m.Id + ") – " + m.PctSample.ToString("P3") + " | " + ppm + " | score=" + m.Score.ToString("F2"));
+                }
+                _listMetals.EndUpdate();
+                _lblMetalsHeader.Text = "Metais (" + _lastAnalysisResult.Metals.Count + ")";
+                _lblCrystalsHeader.Text = "Cristais (" + _lastAnalysisResult.Crystals.Count + ")";
+                _lblGemsHeader.Text = "Gemas (" + _lastAnalysisResult.Gems.Count + ")";
+
+                if (replaceDetails)
+                    _txtDetails.Text = _lastAnalysisResult.ShortReport;
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Erro atualizar listas: " + ex.Message);
+            }
+        }
+
+        private bool TryGetHsvRange(HvsMaterial mat, out (double Min, double Max) h, out (double Min, double Max) s, out (double Min, double Max) v)
+        {
+            h = (0, 0); s = (0, 0); v = (0, 0);
+            if (mat == null || mat.Optico == null) return false;
+            try
+            {
+                string json = JsonSerializer.Serialize(mat.Optico);
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    var root = doc.RootElement;
+                    h = ReadRange(root, "h", 0, 360);
+                    s = ReadRange(root, "s", 0, 1);
+                    v = ReadRange(root, "v", 0, 1);
+                }
+                if (s.Max > 1.0 || s.Min > 1.0) s = (s.Min / 100.0, s.Max / 100.0);
+                if (v.Max > 1.0 || v.Min > 1.0) v = (v.Min / 100.0, v.Max / 100.0);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private (double Min, double Max) ReadRange(JsonElement root, string name, double defMin, double defMax)
+        {
+            if (!root.TryGetProperty(name, out var arr) || arr.ValueKind != JsonValueKind.Array) return (defMin, defMax);
+            if (arr.GetArrayLength() != 2) return (defMin, defMax);
+            double min = arr[0].GetDouble();
+            double max = arr[1].GetDouble();
+            return (min, max);
+        }
+        #endregion
+
+        #region Language Menu
+        private void BtnLanguage_Click(object sender, EventArgs e)
+        {
+            _languageMenu.Show(_btnLanguage, new Point(0, _btnLanguage.Height));
+        }
+
+        private void AddLanguageItem(string caption, string locale)
+        {
+            _languageMenu.Items.Add(caption, null, (s, e) => SetLanguage(locale));
+        }
+
+        private void SetLanguage(string locale)
+        {
+            _btnLanguage.Text = "Idioma (" + locale + ") ▾";
+            AppendLog("Idioma definido: " + locale);
+            // Aqui você pode adaptar textos conforme locale se quiser.
+        }
+        #endregion
+
+        #region Utility
+        private void AppendLog(string message)
+        {
+            if (_txtDetails == null) return;
+            var time = DateTime.Now.ToString("HH:mm:ss");
+            _txtDetails.AppendText("[" + time + "] " + message + "\r\n");
+        }
+
+        private void ShowMaterialDetails(HvsMaterial material)
+        {
+            if (material == null) { _txtDetails.Text = ""; return; }
+            var sb = new StringBuilder();
+            sb.AppendLine("ID: " + material.Id);
+            sb.AppendLine("Nome: " + material.Nome);
+            if (!string.IsNullOrWhiteSpace(material.Grupo))
+                sb.AppendLine("Grupo: " + material.Grupo);
+            _txtDetails.Text = sb.ToString();
+        }
+        #endregion
+    }
+}

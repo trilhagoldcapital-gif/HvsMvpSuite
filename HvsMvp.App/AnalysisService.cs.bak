@@ -1,0 +1,290 @@
+﻿using System;
+using System.Drawing;
+
+namespace HvsMvp.App
+{
+    /// <summary>
+    /// Serviço de análise de amostras, portado do MicroLab.
+    /// Depende de:
+    /// - ImageDiagnosticsService
+    /// - SampleMaskService
+    /// - AppSettings
+    /// - LaudoService
+    /// - HvsKnowledgeService
+    /// - Modelos: SampleFullAnalysisResult, MetalResult, CrystalResult, SampleMaskClass
+    /// </summary>
+    public class AnalysisService
+    {
+        private readonly ImageDiagnosticsService _diag;
+        private readonly SampleMaskService _maskService;
+        private readonly AppSettings _settings;
+        private readonly LaudoService _laudo;
+        private readonly HvsKnowledgeService _knowledge;
+
+        public AnalysisService(
+            ImageDiagnosticsService diag,
+            SampleMaskService maskService,
+            AppSettings settings,
+            LaudoService laudo,
+            HvsKnowledgeService knowledge)
+        {
+            _diag = diag;
+            _maskService = maskService;
+            _settings = settings;
+            _laudo = laudo;
+            _knowledge = knowledge;
+        }
+
+        public (SampleFullAnalysisResult analysis, SampleMaskClass[,] mask, Bitmap maskPreview)
+            RunFullAnalysisWithMaskPreview(Bitmap bmp, string? imagePath)
+        {
+            var diagnostics = _diag.ComputeBasicDiagnostics(bmp);
+            var (mask, maskPreview) = _maskService.BuildMask(bmp);
+
+            var result = new SampleFullAnalysisResult
+            {
+                Id = Guid.NewGuid(),
+                ImagePath = imagePath,
+                Diagnostics = diagnostics,
+                CaptureDateTimeUtc = DateTime.UtcNow
+            };
+
+            // 1) Detecção simples baseada em imagem (Au / Ag / Cu / Quartzo)
+            RunSimpleColorDetection(bmp, mask, result);
+
+            // 2) Completar com TODOS os itens do catálogo HVS
+            AddAllCatalogItemsAsTargets(result);
+
+            return (result, mask, maskPreview);
+        }
+
+        private void RunSimpleColorDetection(Bitmap bmp, SampleMaskClass[,] mask, SampleFullAnalysisResult result)
+        {
+            int width = bmp.Width;
+            int height = bmp.Height;
+
+            long totalSamplePixels = 0;
+            long countAu = 0;
+            long countAg = 0;
+            long countCu = 0;
+            long countQuartz = 0;
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    var m = mask[x, y];
+                    if (m == null || !m.IsSample)
+                        continue;
+
+                    totalSamplePixels++;
+
+                    Color c = bmp.GetPixel(x, y);
+                    double h, s, v;
+                    ColorToHSV(c, out h, out s, out v);
+
+                    bool isAu =
+                        h >= 35 && h <= 65 &&
+                        s >= 0.35 && s <= 0.95 &&
+                        v >= 0.35 && v <= 0.95;
+
+                    bool isAg =
+                        s <= 0.25 &&
+                        v >= 0.60;
+
+                    bool isCu =
+                        h >= 10 && h <= 30 &&
+                        s >= 0.40 && s <= 1.0 &&
+                        v >= 0.25 && v <= 0.80;
+
+                    bool isQuartz =
+                        v >= 0.75 &&
+                        s <= 0.40;
+
+                    if (isAu) countAu++;
+                    if (isAg) countAg++;
+                    if (isCu) countCu++;
+                    if (isQuartz) countQuartz++;
+                }
+            }
+
+            if (totalSamplePixels <= 0)
+                return;
+
+            double pctAu = (double)countAu / totalSamplePixels;
+            double pctAg = (double)countAg / totalSamplePixels;
+            double pctCu = (double)countCu / totalSamplePixels;
+            double pctQuartz = (double)countQuartz / totalSamplePixels;
+
+            if (pctAu > 0)
+            {
+                result.Metals.Add(new MetalResult
+                {
+                    Symbol = "Au",
+                    Name = "Ouro",
+                    PctSample = pctAu,
+                    PpmEstimated = PctToPpm(pctAu)
+                });
+            }
+
+            if (pctAg > 0)
+            {
+                result.Metals.Add(new MetalResult
+                {
+                    Symbol = "Ag",
+                    Name = "Prata",
+                    PctSample = pctAg,
+                    PpmEstimated = PctToPpm(pctAg)
+                });
+            }
+
+            if (pctCu > 0)
+            {
+                result.Metals.Add(new MetalResult
+                {
+                    Symbol = "Cu",
+                    Name = "Cobre",
+                    PctSample = pctCu,
+                    PpmEstimated = PctToPpm(pctCu)
+                });
+            }
+
+            if (pctQuartz > 0)
+            {
+                result.Crystals.Add(new CrystalResult
+                {
+                    Name = "Quartzo",
+                    PctSample = pctQuartz
+                });
+            }
+        }
+
+        private void AddAllCatalogItemsAsTargets(SampleFullAnalysisResult result)
+        {
+            if (_knowledge == null || !_knowledge.IsLoaded)
+                return;
+
+            var existingBySymbol = new System.Collections.Generic.Dictionary<string, MetalResult>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var m in result.Metals)
+            {
+                if (!string.IsNullOrWhiteSpace(m.Symbol) && !existingBySymbol.ContainsKey(m.Symbol))
+                    existingBySymbol[m.Symbol] = m;
+            }
+
+            // METAL
+            foreach (var m in _knowledge.GetAllMetals())
+            {
+                if (m == null) continue;
+                string symbol = m.quimica?.formula ?? "";
+                if (string.IsNullOrWhiteSpace(symbol))
+                    continue;
+
+                if (!existingBySymbol.ContainsKey(symbol))
+                {
+                    var mr = new MetalResult
+                    {
+                        Symbol = symbol,
+                        Name = m.nome ?? symbol,
+                        PctSample = 0.0,
+                        PpmEstimated = null
+                    };
+                    result.Metals.Add(mr);
+                    existingBySymbol[symbol] = mr;
+                }
+            }
+
+            // PGM como metais também
+            foreach (var p in _knowledge.GetAllPgms())
+            {
+                if (p == null) continue;
+                string symbol = p.quimica?.formula ?? "";
+                if (string.IsNullOrWhiteSpace(symbol))
+                    continue;
+
+                if (!existingBySymbol.ContainsKey(symbol))
+                {
+                    var mr = new MetalResult
+                    {
+                        Symbol = symbol,
+                        Name = p.nome ?? symbol,
+                        PctSample = 0.0,
+                        PpmEstimated = null
+                    };
+                    result.Metals.Add(mr);
+                    existingBySymbol[symbol] = mr;
+                }
+            }
+
+            var existingCrystals = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in result.Crystals)
+            {
+                if (!string.IsNullOrWhiteSpace(c.Name))
+                    existingCrystals.Add(c.Name);
+            }
+
+            foreach (var c in _knowledge.GetAllCristais())
+            {
+                if (c == null) continue;
+                string name = c.nome ?? "";
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+
+                if (!existingCrystals.Contains(name))
+                {
+                    result.Crystals.Add(new CrystalResult
+                    {
+                        Name = name,
+                        PctSample = 0.0
+                    });
+                    existingCrystals.Add(name);
+                }
+            }
+
+            foreach (var g in _knowledge.GetAllGemas())
+            {
+                if (g == null) continue;
+                string name = g.nome ?? "";
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+
+                if (!existingCrystals.Contains(name))
+                {
+                    result.Crystals.Add(new CrystalResult
+                    {
+                        Name = name,
+                        PctSample = 0.0
+                    });
+                    existingCrystals.Add(name);
+                }
+            }
+        }
+
+        private double PctToPpm(double pctFraction)
+        {
+            return pctFraction * 1_000_000.0;
+        }
+
+        public string BuildShortReport(SampleFullAnalysisResult? r)
+        {
+            if (r == null) return "Nenhuma análise disponível.";
+            return _laudo.BuildLaudo(r);
+        }
+
+        public class SelectiveAnalysisSummary
+        {
+            public string TargetId { get; set; } = "";
+            public string Description { get; set; } = "";
+        }
+
+        private static void ColorToHSV(Color color, out double hue, out double saturation, out double value)
+        {
+            int max = Math.Max(color.R, Math.Max(color.G, color.B));
+            int min = Math.Min(color.R, Math.Min(color.G, color.B));
+
+            hue = color.GetHue();
+            saturation = (max == 0) ? 0 : 1d - (1d * min / max);
+            value = max / 255d;
+        }
+    }
+}

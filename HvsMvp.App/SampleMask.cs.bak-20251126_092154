@@ -1,0 +1,271 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+
+namespace HvsMvp.App
+{
+    public class SampleMaskClass
+    {
+        public bool IsSample { get; set; }
+    }
+
+    public class SampleMaskService
+    {
+        // Parâmetros ajustáveis
+        private const int BorderBand = 8;      // largura da faixa de borda para estimar fundo
+        private const double MinSat = 0.10;    // mínimo de saturação para reforçar separação
+        private const double GradThr = 20.0;   // limiar de gradiente (textura)
+        private const int MinComponent = 250;  // descarta componentes muito pequenos
+
+        public (SampleMaskClass[,] mask, Bitmap maskPreview) BuildMask(Bitmap bmp)
+        {
+            using var src = Ensure24bpp(bmp);
+            int w = src.Width, h = src.Height;
+            var rect = new Rectangle(0, 0, w, h);
+            var data = src.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+
+            byte[] buf;
+            int stride, bytes;
+            try
+            {
+                stride = data.Stride;
+                bytes = stride * h;
+                buf = new byte[bytes];
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, bytes);
+            }
+            finally
+            {
+                src.UnlockBits(data);
+            }
+
+            // 1) Estatística do fundo nas bordas
+            double br = 0, bg = 0, bb = 0;  // médias RGB
+            long bcount = 0;
+            void AccBorderPixel(int off)
+            {
+                bb += buf[off + 0];
+                bg += buf[off + 1];
+                br += buf[off + 2];
+                bcount++;
+            }
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    bool onBorder = (x < BorderBand) || (x >= w - BorderBand) || (y < BorderBand) || (y >= h - BorderBand);
+                    if (onBorder)
+                    {
+                        int off = y * stride + x * 3;
+                        AccBorderPixel(off);
+                    }
+                }
+            }
+            if (bcount == 0) bcount = 1;
+            br /= bcount; bg /= bcount; bb /= bcount;
+
+            // 2) Mapa candidato de amostra (fg)
+            bool[,] fg = new bool[w, h];
+            double tColor = 30.0; // limiar de diferença de cor ao fundo (empírico)
+            for (int y = 0; y < h; y++)
+            {
+                int row = y * stride;
+                for (int x = 0; x < w; x++)
+                {
+                    int off = row + x * 3;
+                    double B = buf[off + 0], G = buf[off + 1], R = buf[off + 2];
+
+                    // Diferença de cor ao fundo
+                    double dColor = Math.Sqrt((R - br) * (R - br) + (G - bg) * (G - bg) + (B - bb) * (B - bb));
+
+                    // Gradiente simples
+                    double grad = 0;
+                    if (x > 0 && x < w - 1 && y > 0 && y < h - 1)
+                    {
+                        int offL = row + (x - 1) * 3;
+                        int offR = row + (x + 1) * 3;
+                        int offU = (y - 1) * stride + x * 3;
+                        int offD = (y + 1) * stride + x * 3;
+
+                        int grayL = (int)(0.299 * buf[offL + 2] + 0.587 * buf[offL + 1] + 0.114 * buf[offL + 0]);
+                        int grayR = (int)(0.299 * buf[offR + 2] + 0.587 * buf[offR + 1] + 0.114 * buf[offR + 0]);
+                        int grayU = (int)(0.299 * buf[offU + 2] + 0.587 * buf[offU + 1] + 0.114 * buf[offU + 0]);
+                        int grayD = (int)(0.299 * buf[offD + 2] + 0.587 * buf[offD + 1] + 0.114 * buf[offD + 0]);
+
+                        int gx = grayR - grayL;
+                        int gy = grayD - grayU;
+                        grad = Math.Sqrt(gx * gx + gy * gy);
+                    }
+
+                    // Saturação e valor
+                    RgbToHsvFast((byte)R, (byte)G, (byte)B, out _, out double S, out double V);
+
+                    bool candidate = (dColor > tColor) || (grad > GradThr) || (S > MinSat);
+                    // Cortes de extremos (estouro/pretos)
+                    if (V > 0.99 || V < 0.03) candidate = false;
+
+                    fg[x, y] = candidate;
+                }
+            }
+
+            // 3) Remove tudo que toca borda (parede/recipiente)
+            RemoveBorderTouchingComponents(fg, w, h);
+
+            // 4) Mantém apenas o maior componente (amostra principal)
+            KeepLargestComponent(fg, w, h, MinComponent);
+
+            // 5) Retorno
+            var mask = new SampleMaskClass[w, h];
+            var preview = new Bitmap(w, h, PixelFormat.Format24bppRgb);
+            var pData = preview.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format24bppRgb);
+            try
+            {
+                int bytes2 = pData.Stride * pData.Height;
+                byte[] outBuf = new byte[bytes2];
+
+                for (int y = 0; y < h; y++)
+                {
+                    int row2 = y * pData.Stride;
+                    for (int x = 0; x < w; x++)
+                    {
+                        bool s = fg[x, y];
+                        mask[x, y] = new SampleMaskClass { IsSample = s };
+                        int off2 = row2 + x * 3;
+                        if (s)
+                        {
+                            outBuf[off2 + 0] = 0;
+                            outBuf[off2 + 1] = 255;
+                            outBuf[off2 + 2] = 0;
+                        }
+                        else
+                        {
+                            outBuf[off2 + 0] = 0;
+                            outBuf[off2 + 1] = 0;
+                            outBuf[off2 + 2] = 0;
+                        }
+                    }
+                }
+
+                System.Runtime.InteropServices.Marshal.Copy(outBuf, 0, pData.Scan0, bytes2);
+            }
+            finally
+            {
+                preview.UnlockBits(pData);
+            }
+
+            return (mask, preview);
+        }
+
+        private static Bitmap Ensure24bpp(Bitmap src)
+        {
+            if (src.PixelFormat == PixelFormat.Format24bppRgb)
+                return (Bitmap)src.Clone();
+
+            var clone = new Bitmap(src.Width, src.Height, PixelFormat.Format24bppRgb);
+            using var g = Graphics.FromImage(clone);
+            g.DrawImage(src, new Rectangle(0, 0, src.Width, src.Height));
+            return clone;
+        }
+
+        private static void RgbToHsvFast(byte r, byte g, byte b, out double h, out double s, out double v)
+        {
+            double rd = r / 255.0, gd = g / 255.0, bd = b / 255.0;
+            double max = Math.Max(rd, Math.Max(gd, bd));
+            double min = Math.Min(rd, Math.Min(gd, bd));
+            v = max;
+            double delta = max - min;
+            s = max == 0 ? 0 : delta / max;
+
+            if (delta == 0) { h = 0; return; }
+            double hue;
+            if (max == rd) hue = 60 * (((gd - bd) / delta) % 6);
+            else if (max == gd) hue = 60 * (((bd - rd) / delta) + 2);
+            else hue = 60 * (((rd - gd) / delta) + 4);
+            if (hue < 0) hue += 360;
+            h = hue;
+        }
+
+        private static void RemoveBorderTouchingComponents(bool[,] fg, int w, int h)
+        {
+            var q = new Queue<(int x, int y)>();
+            bool[,] vis = new bool[w, h];
+
+            void EnqueueIf(int x, int y)
+            {
+                if (x < 0 || x >= w || y < 0 || y >= h) return;
+                if (vis[x, y]) return;
+                if (!fg[x, y]) return;
+                vis[x, y] = true;
+                q.Enqueue((x, y));
+            }
+
+            for (int x = 0; x < w; x++) { EnqueueIf(x, 0); EnqueueIf(x, h - 1); }
+            for (int y = 0; y < h; y++) { EnqueueIf(0, y); EnqueueIf(w - 1, y); }
+
+            int[] dx = { -1, 0, 1, -1, 1, -1, 0, 1 };
+            int[] dy = { -1, -1, -1, 0, 0, 1, 1, 1 };
+            while (q.Count > 0)
+            {
+                var (cx, cy) = q.Dequeue();
+                fg[cx, cy] = false;
+                for (int k = 0; k < 8; k++)
+                    EnqueueIf(cx + dx[k], cy + dy[k]);
+            }
+        }
+
+        private static void KeepLargestComponent(bool[,] fg, int w, int h, int minComponent)
+        {
+            bool[,] vis = new bool[w, h];
+            int[] dx = { -1, 0, 1, -1, 1, -1, 0, 1 };
+            int[] dy = { -1, -1, -1, 0, 0, 1, 1, 1 };
+
+            int bestCount = 0;
+            List<(int x, int y)> bestPixels = new();
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (!fg[x, y] || vis[x, y]) continue;
+
+                    var q = new Queue<(int x, int y)>();
+                    var comp = new List<(int x, int y)>();
+                    vis[x, y] = true;
+                    q.Enqueue((x, y)); comp.Add((x, y));
+
+                    while (q.Count > 0)
+                    {
+                        var (cx, cy) = q.Dequeue();
+                        for (int k = 0; k < 8; k++)
+                        {
+                            int nx = cx + dx[k], ny = cy + dy[k];
+                            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                            if (vis[nx, ny]) continue;
+                            if (!fg[nx, ny]) continue;
+                            vis[nx, ny] = true;
+                            q.Enqueue((nx, ny));
+                            comp.Add((nx, ny));
+                        }
+                    }
+
+                    if (comp.Count > bestCount)
+                    {
+                        bestCount = comp.Count;
+                        bestPixels = comp;
+                    }
+                }
+            }
+
+            // Zera tudo e reativa só o maior (se significativo)
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    fg[x, y] = false;
+
+            if (bestCount >= minComponent)
+            {
+                foreach (var (x, y) in bestPixels)
+                    fg[x, y] = true;
+            }
+        }
+    }
+}

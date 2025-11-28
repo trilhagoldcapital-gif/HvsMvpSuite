@@ -1,0 +1,14 @@
+C:\tgpm\HvsMvp.Debug\bin\Debug\net8.0\HvsMvp.Debug.exe
+C:\tgpm\HvsMvp.Debug\bin\Debug\net8.0\HvsMvp.Debug.deps.json
+C:\tgpm\HvsMvp.Debug\bin\Debug\net8.0\HvsMvp.Debug.runtimeconfig.json
+C:\tgpm\HvsMvp.Debug\bin\Debug\net8.0\HvsMvp.Debug.dll
+C:\tgpm\HvsMvp.Debug\bin\Debug\net8.0\HvsMvp.Debug.pdb
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.GeneratedMSBuildEditorConfig.editorconfig
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.AssemblyInfoInputs.cache
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.AssemblyInfo.cs
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.csproj.CoreCompileInputs.cache
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.dll
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\refint\HvsMvp.Debug.dll
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.pdb
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\HvsMvp.Debug.genruntimeconfig.cache
+C:\tgpm\HvsMvp.Debug\obj\Debug\net8.0\ref\HvsMvp.Debug.dll

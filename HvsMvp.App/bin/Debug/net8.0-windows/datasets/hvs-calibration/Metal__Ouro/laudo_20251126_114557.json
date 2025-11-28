@@ -1,0 +1,344 @@
+{
+  "id": "dbe02bab-d2ee-437a-b4d7-14a5841372dc",
+  "utc": "2025-11-26T11:45:57.3711258Z",
+  "alvo": "Metal__Ouro",
+  "diagnostics": {
+    "focus": 0.0009486291997735913,
+    "clipping": 8.198302469135803E-06,
+    "foreground": 1
+  },
+  "metals": [
+    {
+      "id": "Au",
+      "name": "Ouro",
+      "group": "nobre",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Ag",
+      "name": "Prata",
+      "group": "nobre",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Pt",
+      "name": "Platina",
+      "group": "PGM",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Pd",
+      "name": "Pal\u00E1dio",
+      "group": "PGM",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Rh",
+      "name": "R\u00F3dio",
+      "group": "PGM",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Ir",
+      "name": "Ir\u00EDdio",
+      "group": "PGM",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Ru",
+      "name": "Rut\u00EAnio",
+      "group": "PGM",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Os",
+      "name": "\u00D3smio",
+      "group": "PGM",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Cu",
+      "name": "Cobre",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Al",
+      "name": "Alum\u00EDnio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Fe",
+      "name": "Ferro",
+      "group": "comum",
+      "pct": 0.00014178240740740742,
+      "ppm": 141.78240740740742,
+      "score": 0.0014178240740740742
+    },
+    {
+      "id": "Ni",
+      "name": "N\u00EDquel",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Co",
+      "name": "Cobalto",
+      "group": "comum",
+      "pct": 0.00011140046296296297,
+      "ppm": 111.40046296296296,
+      "score": 0.0011140046296296297
+    },
+    {
+      "id": "Ti",
+      "name": "Tit\u00E2nio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "W",
+      "name": "Tungst\u00EAnio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Mo",
+      "name": "Molibd\u00EAnio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Cr",
+      "name": "Cromo",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Mn",
+      "name": "Mangan\u00EAs",
+      "group": "comum",
+      "pct": 1.7843364197530866E-05,
+      "ppm": 17.843364197530867,
+      "score": 0.00017843364197530866
+    },
+    {
+      "id": "Zn",
+      "name": "Zinco",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Sn",
+      "name": "Estanho",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Pb",
+      "name": "Chumbo",
+      "group": "comum",
+      "pct": 0.0010132137345679013,
+      "ppm": 1013.2137345679013,
+      "score": 0.010132137345679013
+    },
+    {
+      "id": "Mg",
+      "name": "Magn\u00E9sio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Si",
+      "name": "Sil\u00EDcio",
+      "group": "metaloide",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "V",
+      "name": "Van\u00E1dio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Nb",
+      "name": "Ni\u00F3bio",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    },
+    {
+      "id": "Ta",
+      "name": "T\u00E2ntalo",
+      "group": "comum",
+      "pct": 0,
+      "ppm": null,
+      "score": 0
+    }
+  ],
+  "crystals": [
+    {
+      "id": "SiO2",
+      "name": "Quartzo",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "CaCO3",
+      "name": "Calcita",
+      "pct": 0.00016107253086419752,
+      "score": 0.0008053626543209876
+    },
+    {
+      "id": "CaF2",
+      "name": "Fluorita",
+      "pct": 0.00018759645061728396,
+      "score": 0.0009379822530864198
+    },
+    {
+      "id": "NaCl",
+      "name": "Halita",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "CaSO4\u00B72H2O",
+      "name": "Gipsita",
+      "pct": 0.0018233989197530864,
+      "score": 0.009116994598765431
+    },
+    {
+      "id": "Mica",
+      "name": "Mica",
+      "pct": 0.0011559606481481481,
+      "score": 0.005779803240740741
+    },
+    {
+      "id": "Feldspato",
+      "name": "Feldspato",
+      "pct": 0.000787037037037037,
+      "score": 0.003935185185185186
+    },
+    {
+      "id": "Dolomita",
+      "name": "Dolomita",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "Apatita",
+      "name": "Apatita",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "Olivina",
+      "name": "Olivina",
+      "pct": 0.00010754243827160494,
+      "score": 0.0005377121913580247
+    }
+  ],
+  "gems": [
+    {
+      "id": "C",
+      "name": "Diamante",
+      "pct": 1.253858024691358E-05,
+      "score": 0.00010030864197530864
+    },
+    {
+      "id": "Al2O3_blue",
+      "name": "Safira",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "Al2O3_red",
+      "name": "Rubi",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "Be3Al2Si6O18",
+      "name": "Esmeralda",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "SiO2_purple",
+      "name": "Ametista",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "Al2SiO4F2OH",
+      "name": "Top\u00E1zio",
+      "pct": 0.00010850694444444444,
+      "score": 0.0008680555555555555
+    },
+    {
+      "id": "SiO2_hydrated",
+      "name": "Opala",
+      "pct": 0.0063305362654320985,
+      "score": 0.05064429012345679
+    },
+    {
+      "id": "X3Y2(SiO4)3",
+      "name": "Granada",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "Be3Al2Si6O18_blue",
+      "name": "\u00C1gua-marinha",
+      "pct": 0,
+      "score": 0
+    },
+    {
+      "id": "MgFeSiO4_green",
+      "name": "Peridoto",
+      "pct": 0,
+      "score": 0
+    }
+  ]
+}

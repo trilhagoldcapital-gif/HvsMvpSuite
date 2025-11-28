@@ -1,0 +1,23 @@
+﻿Resumo rápido da análise
+------------------------
+Data/Hora (UTC): 2025-11-28 05:42:45
+Foco (0..1): 0,00
+Clipping saturação: 0,0%
+Fraçao amostra: 0,1%
+
+Metais (top 5):
+ - Platina (Pt): 51,345% · 513449,9 ppm · score=1,00
+ - Ouro (Au): 3,800% · 37996,0 ppm · score=0,38
+ - Prata (Ag): 0,000% · - · score=0,00
+ - Paládio (Pd): 0,000% · - · score=0,00
+ - Ródio (Rh): 0,000% · - · score=0,00
+
+Cristais (top 3):
+ - Quartzo: 0,000% · score=0,00
+ - Calcita: 0,000% · score=0,00
+ - Fluorita: 0,000% · score=0,00
+
+Gemas (top 3):
+ - Diamante: 0,000% · score=0,00
+ - Safira: 0,000% · score=0,00
+ - Rubi: 0,000% · score=0,00
