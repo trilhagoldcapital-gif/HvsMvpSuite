@@ -82,6 +82,39 @@ namespace HvsMvp.App
             {
                 _particleTimer.Start();
                 _fadeTimer.Start();
+                
+                // PR15: Safety fallback - ensure form becomes visible after 1 second
+                // even if fade animation fails
+                var visibilityTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+                visibilityTimer.Tick += (ts, te) =>
+                {
+                    visibilityTimer.Stop();
+                    visibilityTimer.Dispose();
+                    try
+                    {
+                        if (!IsDisposed && Opacity < 0.9)
+                        {
+                            Opacity = 1.0;
+                            _fadingIn = false;
+                        }
+                    }
+                    catch { } // Ignore errors if form is disposed
+                };
+                visibilityTimer.Start();
+            };
+            
+            // PR15: Ensure visibility timer is cleaned up on form close
+            FormClosing += (s, e) =>
+            {
+                // Timers are already stopped in OnFormClosing, but ensure visibility
+                try
+                {
+                    if (Opacity < 0.5 && !IsDisposed)
+                    {
+                        Opacity = 1.0;
+                    }
+                }
+                catch { }
             };
         }
 

@@ -269,8 +269,16 @@ namespace HvsMvp.App
                 var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "hvs-config.json");
                 if (!File.Exists(configPath))
                 {
-                    MessageBox.Show(this, $"Arquivo de configuração não encontrado:\n{configPath}", "HVS Config", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    Application.Exit();
+                    // PR15: Instead of Application.Exit(), show error and let user decide
+                    // The app can still function with limited features
+                    MessageBox.Show(this, 
+                        $"Arquivo de configuração não encontrado:\n{configPath}\n\nO aplicativo pode não funcionar corretamente sem este arquivo.", 
+                        "HVS Config - Aviso", 
+                        MessageBoxButtons.OK, 
+                        MessageBoxIcon.Warning);
+                    
+                    // Create a minimal default config so the app doesn't crash
+                    _config = new HvsConfig();
                     return;
                 }
 
@@ -286,8 +294,14 @@ namespace HvsMvp.App
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, $"Erro ao carregar configuração HVS:\n\n{ex}", "HVS Config", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Application.Exit();
+                // PR15: Show error but don't exit - let the app continue with limited functionality
+                MessageBox.Show(this, 
+                    $"Erro ao carregar configuração HVS:\n\n{ex.Message}\n\nO aplicativo continuará com funcionalidade limitada.", 
+                    "HVS Config - Erro", 
+                    MessageBoxButtons.OK, 
+                    MessageBoxIcon.Warning);
+                
+                _config = new HvsConfig();
             }
         }
 

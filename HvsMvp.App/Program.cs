@@ -46,7 +46,8 @@ namespace HvsMvp.App
         }
 
         /// <summary>
-        /// PR14: Main application startup logic with fail-safe fallback.
+        /// PR14/PR15: Main application startup logic with fail-safe fallback.
+        /// PR15: Enhanced robustness - always show either WelcomeScreen, MainForm, or error message.
         /// </summary>
         private static void RunApplicationWithFallback()
         {
@@ -80,7 +81,7 @@ namespace HvsMvp.App
                 splash = null;
             }
 
-            // PR14: Determine welcome action with fallback
+            // PR14/PR15: Determine welcome action with fallback
             WelcomeScreen.WelcomeAction welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
             string? selectedImagePath = null;
 
@@ -90,16 +91,41 @@ namespace HvsMvp.App
                 {
                     // Close splash before showing welcome
                     CloseSplashSafely(splash, splashStartTime);
+                    splash = null; // Mark as closed
 
                     // PR14: Show welcome screen in try-catch with fallback
                     LogStartupInfo("Creating WelcomeScreen...");
                     using var welcomeScreen = new WelcomeScreen(appSettings);
+                    
+                    // PR15: Ensure welcome screen is visible (in case fade-in fails)
+                    welcomeScreen.Load += (s, e) =>
+                    {
+                        // Safety: ensure form becomes visible after a delay even if animation fails
+                        // Use a timer instead of Task.Delay for better control and cleanup
+                        var visibilityTimer = new System.Windows.Forms.Timer { Interval = 500 };
+                        visibilityTimer.Tick += (ts, te) =>
+                        {
+                            visibilityTimer.Stop();
+                            visibilityTimer.Dispose();
+                            try
+                            {
+                                if (!welcomeScreen.IsDisposed && welcomeScreen.Opacity < 0.5)
+                                {
+                                    welcomeScreen.Opacity = 1.0;
+                                    LogStartupInfo("WelcomeScreen forced visible (animation fallback).");
+                                }
+                            }
+                            catch { } // Ignore errors if form is disposed
+                        };
+                        visibilityTimer.Start();
+                    };
                     
                     // PR14: Ensure welcome screen is positioned on-screen
                     EnsureFormIsOnScreen(welcomeScreen);
                     
                     LogStartupInfo("Showing WelcomeScreen dialog...");
                     var result = welcomeScreen.ShowDialog();
+                    LogStartupInfo($"WelcomeScreen dialog returned: {result}");
 
                     if (result == DialogResult.OK)
                     {
@@ -117,9 +143,10 @@ namespace HvsMvp.App
                     }
                     else
                     {
-                        // User closed welcome without selecting action - exit app
-                        LogStartupInfo("User closed WelcomeScreen without action, exiting.");
-                        return;
+                        // PR15: User closed welcome without selecting action
+                        // Instead of exiting silently, show MainForm anyway (user can close it if they want)
+                        LogStartupInfo("User closed WelcomeScreen without action, proceeding to MainForm.");
+                        welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
                     }
                 }
                 catch (Exception ex)
@@ -127,7 +154,19 @@ namespace HvsMvp.App
                     // PR14: Welcome screen failed - fall back to MainForm
                     LogStartupError("WelcomeScreen failed, falling back to MainForm", ex);
                     CloseSplashSafely(splash, DateTime.UtcNow);
+                    splash = null;
                     welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
+                    
+                    // PR15: Show error message to user
+                    try
+                    {
+                        MessageBox.Show(
+                            $"A tela de boas-vindas falhou ao carregar.\nO aplicativo iniciará em modo direto.\n\nDetalhes: {ex.Message}",
+                            "HVS-MVP - Aviso de Inicialização",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                    }
+                    catch { }
                 }
             }
             else
@@ -172,7 +211,7 @@ namespace HvsMvp.App
                 welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
             }
 
-            // PR14: Create and run main form with fallback
+            // PR15: Create and run main form with fallback
             try
             {
                 LogStartupInfo("Creating MainForm...");
@@ -180,8 +219,12 @@ namespace HvsMvp.App
                 
                 // PR14: Ensure main form is positioned on-screen
                 EnsureFormIsOnScreen(mainForm);
+                
+                // PR15: Ensure main form is visible (safety)
+                mainForm.WindowState = FormWindowState.Normal;
+                mainForm.Visible = true;
 
-                // PR10: Apply welcome action to main form
+                // PR10/PR15: Apply welcome action to main form
                 mainForm.Shown += async (s, e) =>
                 {
                     // Ensure splash is closed

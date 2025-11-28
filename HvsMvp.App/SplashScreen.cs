@@ -184,6 +184,25 @@ namespace HvsMvp.App
             Show();
             _animationTimer.Start();
             _closeTimer.Start();
+            
+            // PR15: Safety fallback - ensure splash becomes visible after 500ms
+            // even if fade animation fails
+            var visibilityTimer = new System.Windows.Forms.Timer { Interval = 500 };
+            visibilityTimer.Tick += (s, e) =>
+            {
+                visibilityTimer.Stop();
+                visibilityTimer.Dispose();
+                try
+                {
+                    if (!IsDisposed && !_fadingOut && Opacity < 0.9)
+                    {
+                        Opacity = 1.0;
+                        _fadingIn = false;
+                    }
+                }
+                catch { } // Ignore errors if form is disposed
+            };
+            visibilityTimer.Start();
         }
 
         public void CloseSplash()
