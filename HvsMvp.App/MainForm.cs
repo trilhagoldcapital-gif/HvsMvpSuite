@@ -912,6 +912,11 @@ namespace HvsMvp.App
                 _txtDetails.Text = scene.Summary.ShortReport;
                 UpdateMaterialListsFromScene();
                 AppendLog("Análise HVS completa concluída.");
+
+                // BLOCO 1 – exibe na barra de status o índice de qualidade do laudo
+                var s = scene.Summary;
+                _lblStatus.Text =
+                    $"Qualidade: {s.QualityIndex:F1} ({s.QualityStatus}) · Foco={s.Diagnostics.FocusScorePercent:F1} · Exposição={s.Diagnostics.ExposureScore:F1} · Máscara={s.Diagnostics.MaskScore:F1}";
             }
             catch (Exception ex)
             {
@@ -1307,7 +1312,12 @@ namespace HvsMvp.App
                     diagnostics = s.Diagnostics,
                     metals = s.Metals,
                     crystals = s.Crystals,
-                    gems = s.Gems
+                    gems = s.Gems,
+                    quality = new
+                    {
+                        s.QualityIndex,
+                        s.QualityStatus
+                    }
                 };
                 string json = JsonSerializer.Serialize(obj, new JsonSerializerOptions { WriteIndented = true });
                 string path = Path.Combine(dir, "analysis_" + DateTime.UtcNow.ToString("yyyyMMdd_HHmmss") + ".json");
@@ -1554,7 +1564,9 @@ namespace HvsMvp.App
                     {
                         focus = s.Diagnostics.FocusScore,
                         clipping = s.Diagnostics.SaturationClippingFraction,
-                        foreground = s.Diagnostics.ForegroundFraction
+                        foreground = s.Diagnostics.ForegroundFraction,
+                        qualityIndex = s.QualityIndex,
+                        qualityStatus = s.QualityStatus
                     },
                     metals = s.Metals.ConvertAll(m => new { id = m.Id, name = m.Name, group = m.Group, pct = m.PctSample, ppm = m.PpmEstimated, score = m.Score }),
                     crystals = s.Crystals.ConvertAll(c => new { id = c.Id, name = c.Name, pct = c.PctSample, score = c.Score }),
@@ -1730,7 +1742,8 @@ namespace HvsMvp.App
                 _lastScene.Summary = result;
 
             UpdateMaterialListsFromScene();
-            _lblStatus.Text = "Contínuo: foco=" + result.Diagnostics.FocusScore.ToString("F2");
+            _lblStatus.Text =
+                $"Contínuo: foco={result.Diagnostics.FocusScore:F2} · Qualidade={result.QualityIndex:F1} ({result.QualityStatus})";
         }
 
         private Bitmap? SafeGetCurrentFrameClone()
