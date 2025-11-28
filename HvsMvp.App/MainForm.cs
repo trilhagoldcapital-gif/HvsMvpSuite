@@ -12,6 +12,10 @@ namespace HvsMvp.App
 {
     public class MainForm : Form
     {
+        // PR9: UI Constants
+        private const int ActiveBorderSize = 2;
+        private const int NormalBorderSize = 1;
+        
         private HvsConfig? _config;
         private HvsAnalysisService? _analysisService;
         private AppSettings _appSettings = null!;
@@ -949,28 +953,22 @@ namespace HvsMvp.App
             };
             _logControlPanel.Controls.Add(lblLogTitle);
 
-            _btnSaveLog = new Button
+            // PR9: Use FlowLayoutPanel for log control buttons (right-aligned)
+            var logButtonFlow = new FlowLayoutPanel
             {
-                Text = "💾 Salvar",
-                Size = new Size(70, 20),
-                Location = new Point(logContainer.Width - 160, 3),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                BackColor = Color.FromArgb(30, 50, 70),
-                ForeColor = Color.WhiteSmoke,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 8)
+                Dock = DockStyle.Right,
+                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                WrapContents = false,
+                Padding = new Padding(0)
             };
-            _btnSaveLog.FlatAppearance.BorderColor = Color.FromArgb(50, 70, 100);
-            _btnSaveLog.FlatAppearance.BorderSize = 1;
-            _btnSaveLog.Click += BtnSaveLog_Click;
-            _logControlPanel.Controls.Add(_btnSaveLog);
+            _logControlPanel.Controls.Add(logButtonFlow);
 
             _btnClearLog = new Button
             {
                 Text = "🗑 Limpar",
                 Size = new Size(70, 20),
-                Location = new Point(logContainer.Width - 80, 3),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Margin = new Padding(2, 2, 4, 0),
                 BackColor = Color.FromArgb(30, 50, 70),
                 ForeColor = Color.WhiteSmoke,
                 FlatStyle = FlatStyle.Flat,
@@ -979,7 +977,22 @@ namespace HvsMvp.App
             _btnClearLog.FlatAppearance.BorderColor = Color.FromArgb(50, 70, 100);
             _btnClearLog.FlatAppearance.BorderSize = 1;
             _btnClearLog.Click += BtnClearLog_Click;
-            _logControlPanel.Controls.Add(_btnClearLog);
+            logButtonFlow.Controls.Add(_btnClearLog);
+
+            _btnSaveLog = new Button
+            {
+                Text = "💾 Salvar",
+                Size = new Size(70, 20),
+                Margin = new Padding(2, 2, 2, 0),
+                BackColor = Color.FromArgb(30, 50, 70),
+                ForeColor = Color.WhiteSmoke,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8)
+            };
+            _btnSaveLog.FlatAppearance.BorderColor = Color.FromArgb(50, 70, 100);
+            _btnSaveLog.FlatAppearance.BorderSize = 1;
+            _btnSaveLog.Click += BtnSaveLog_Click;
+            logButtonFlow.Controls.Add(_btnSaveLog);
 
             _txtDetails = new TextBox
             {
@@ -1316,7 +1329,7 @@ namespace HvsMvp.App
             if (btn == null) return;
             btn.BackColor = backColor;
             btn.FlatAppearance.BorderColor = borderColor;
-            btn.FlatAppearance.BorderSize = active ? 2 : 1;
+            btn.FlatAppearance.BorderSize = active ? ActiveBorderSize : NormalBorderSize;
         }
         
         /// <summary>
