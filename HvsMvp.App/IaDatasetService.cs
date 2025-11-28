@@ -15,6 +15,7 @@ namespace HvsMvp.App
     {
         private readonly AppSettings _settings;
         private const int DefaultCropSize = 64;
+        private const int MinParticleAreaPixels = 16;
 
         public IaDatasetService(AppSettings settings)
         {
@@ -60,7 +61,7 @@ namespace HvsMvp.App
                 try
                 {
                     // Skip very small particles
-                    if (particle.ApproxAreaPixels < 16)
+                    if (particle.ApproxAreaPixels < MinParticleAreaPixels)
                     {
                         skippedCount++;
                         continue;

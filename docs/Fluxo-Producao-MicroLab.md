@@ -342,7 +342,7 @@ O MicroLab avalia automaticamente:
 Para suporte técnico:
 - Consulte a documentação em `docs/`
 - Abra uma issue no repositório GitHub
-- Contate: suporte@trilhagold.com
+- Contate o suporte através do contato configurado em **Configurações > Perfil > Contato WhatsApp**
 
 ---
 
