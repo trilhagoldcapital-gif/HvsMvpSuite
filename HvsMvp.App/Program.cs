@@ -7,8 +7,8 @@ namespace HvsMvp.App
 {
     internal static class Program
     {
-        // Splash screen display time in milliseconds (10 seconds)
-        private const int SplashDisplayTimeMs = 10000;
+        // PR9: Reduced splash display time for better UX (3 seconds)
+        private const int SplashDisplayTimeMs = 3000;
 
         [STAThread]
         static void Main()
@@ -23,7 +23,7 @@ namespace HvsMvp.App
             {
                 splash = new SplashScreen();
                 splash.ShowSplash();
-                splash.SetMaxTimeout(12000); // Safety timeout: 12 seconds max
+                splash.SetMaxTimeout(5000); // Safety timeout: 5 seconds max
             }
             catch
             {
