@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 namespace HvsMvp.App
 {
     /// <summary>
-    /// PR9: Enhanced quality checklist panel with improved styling.
+    /// PR10: Enhanced quality checklist panel with futuristic styling.
     /// </summary>
     public class QualityChecklistPanel : Panel
     {
@@ -25,6 +26,16 @@ namespace HvsMvp.App
         private const double ExposureGoodThreshold = 70;
         private const double ExposureWarningThreshold = 50;
 
+        // PR10: Color palette
+        private readonly Color _bgColor = Color.FromArgb(12, 20, 32);
+        private readonly Color _borderColor = Color.FromArgb(40, 55, 75);
+        private readonly Color _titleColor = Color.FromArgb(200, 160, 60);
+        private readonly Color _textColor = Color.FromArgb(200, 210, 225);
+        private readonly Color _warningColor = Color.FromArgb(220, 180, 80);
+        private readonly Color _goodColor = Color.FromArgb(100, 200, 100);
+        private readonly Color _badColor = Color.FromArgb(220, 100, 100);
+        private readonly Color _grayColor = Color.FromArgb(120, 130, 150);
+
         public QualityChecklistPanel()
         {
             InitializeComponent();
@@ -32,33 +43,40 @@ namespace HvsMvp.App
 
         private void InitializeComponent()
         {
-            BackColor = Color.FromArgb(12, 20, 32);
-            BorderStyle = BorderStyle.FixedSingle;
-            Size = new Size(200, 160);
-            Padding = new Padding(8, 4, 8, 4);
+            BackColor = _bgColor;
+            BorderStyle = BorderStyle.None;
+            Size = new Size(220, 145);
+            Padding = new Padding(10, 6, 10, 6);
+
+            // Custom paint for border
+            Paint += (s, e) =>
+            {
+                using var pen = new Pen(_borderColor, 1);
+                e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            };
 
             _lblTitle = new Label
             {
                 Text = "📋 Checklist de Qualidade",
-                Location = new Point(8, 6),
-                Size = new Size(180, 20),
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = Color.FromArgb(200, 210, 230)
+                Location = new Point(10, 8),
+                Size = new Size(200, 20),
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = _titleColor
             };
             Controls.Add(_lblTitle);
 
-            _lblFocusStatus = CreateStatusLabel(30);
-            _lblMaskStatus = CreateStatusLabel(50);
-            _lblExposureStatus = CreateStatusLabel(70);
-            _lblOverallStatus = CreateStatusLabel(94);
+            _lblFocusStatus = CreateStatusLabel(32);
+            _lblMaskStatus = CreateStatusLabel(52);
+            _lblExposureStatus = CreateStatusLabel(72);
+            _lblOverallStatus = CreateStatusLabel(96);
             _lblOverallStatus.Font = new Font("Segoe UI", 9, FontStyle.Bold);
 
             _lblWarnings = new Label
             {
-                Location = new Point(8, 118),
-                Size = new Size(180, 36),
+                Location = new Point(10, 118),
+                Size = new Size(200, 24),
                 Font = new Font("Segoe UI", 8),
-                ForeColor = Color.FromArgb(220, 180, 80),
+                ForeColor = _warningColor,
                 AutoEllipsis = true
             };
 
@@ -76,10 +94,10 @@ namespace HvsMvp.App
         {
             return new Label
             {
-                Location = new Point(8, yPosition),
-                Size = new Size(180, 18),
+                Location = new Point(10, yPosition),
+                Size = new Size(200, 18),
                 Font = new Font("Segoe UI", 8.5f),
-                ForeColor = Color.Gainsboro
+                ForeColor = _textColor
             };
         }
 
@@ -97,7 +115,7 @@ namespace HvsMvp.App
             // Focus status
             double focusPercent = diagnostics.FocusScorePercent;
             var focusStatus = GetStatus(focusPercent, FocusGoodThreshold * 100, FocusWarningThreshold * 100);
-            _lblFocusStatus.Text = $"Foco: {focusStatus.Icon} {focusStatus.Text} ({focusPercent:F0})";
+            _lblFocusStatus.Text = $"Foco: {focusStatus.Icon} {focusStatus.Text} ({focusPercent:F0}%)";
             _lblFocusStatus.ForeColor = focusStatus.Color;
 
             // Mask status (using foreground fraction and status)
@@ -136,16 +154,16 @@ namespace HvsMvp.App
         public void ClearChecklist()
         {
             _lblFocusStatus.Text = "Foco: –";
-            _lblFocusStatus.ForeColor = Color.Gray;
+            _lblFocusStatus.ForeColor = _grayColor;
 
             _lblMaskStatus.Text = "Máscara: –";
-            _lblMaskStatus.ForeColor = Color.Gray;
+            _lblMaskStatus.ForeColor = _grayColor;
 
             _lblExposureStatus.Text = "Exposição: –";
-            _lblExposureStatus.ForeColor = Color.Gray;
+            _lblExposureStatus.ForeColor = _grayColor;
 
             _lblOverallStatus.Text = "Geral: Aguardando análise";
-            _lblOverallStatus.ForeColor = Color.Gray;
+            _lblOverallStatus.ForeColor = _grayColor;
 
             _lblWarnings.Text = "";
             _lblWarnings.Visible = false;
@@ -154,11 +172,11 @@ namespace HvsMvp.App
         private (string Icon, string Text, Color Color) GetStatus(double value, double goodThreshold, double warningThreshold)
         {
             if (value >= goodThreshold)
-                return ("✅", "OK", Color.FromArgb(100, 200, 100));
+                return ("✅", "OK", _goodColor);
             else if (value >= warningThreshold)
-                return ("⚠️", "Atenção", Color.FromArgb(220, 180, 80));
+                return ("⚠️", "Atenção", _warningColor);
             else
-                return ("❌", "Ruim", Color.FromArgb(220, 100, 100));
+                return ("❌", "Ruim", _badColor);
         }
 
         private (string Icon, string Text, Color Color) GetMaskStatus(double fraction, string? fractionStatus)
@@ -167,11 +185,11 @@ namespace HvsMvp.App
             if (!string.IsNullOrEmpty(fractionStatus))
             {
                 if (fractionStatus == "OK")
-                    return ("✅", "OK", Color.FromArgb(100, 200, 100));
+                    return ("✅", "OK", _goodColor);
                 else if (fractionStatus.Contains("Muito"))
-                    return ("❌", fractionStatus, Color.FromArgb(220, 100, 100));
+                    return ("❌", fractionStatus, _badColor);
                 else
-                    return ("⚠️", fractionStatus, Color.FromArgb(220, 180, 80));
+                    return ("⚠️", fractionStatus, _warningColor);
             }
 
             // Fallback to original logic
@@ -179,11 +197,11 @@ namespace HvsMvp.App
             // Warning: <30% or >80%
             // Bad: <10% or >95%
             if (fraction >= 0.3 && fraction <= 0.8)
-                return ("✅", "OK", Color.FromArgb(100, 200, 100));
+                return ("✅", "OK", _goodColor);
             else if (fraction >= 0.1 && fraction <= 0.95)
-                return ("⚠️", "Atenção", Color.FromArgb(220, 180, 80));
+                return ("⚠️", "Atenção", _warningColor);
             else
-                return ("❌", "Ruim", Color.FromArgb(220, 100, 100));
+                return ("❌", "Ruim", _badColor);
         }
 
         private (string Icon, string Text, Color Color) GetOverallStatus(
@@ -205,11 +223,11 @@ namespace HvsMvp.App
             else if (exposure.Icon == "⚠️") warningCount++;
 
             if (badCount > 0)
-                return ("❌", "Problemas", Color.FromArgb(220, 100, 100));
+                return ("❌", "Problemas", _badColor);
             else if (warningCount > 0)
-                return ("⚠️", "Atenções", Color.FromArgb(220, 180, 80));
+                return ("⚠️", "Atenções", _warningColor);
             else
-                return ("✅", "Bom", Color.FromArgb(100, 200, 100));
+                return ("✅", "Bom", _goodColor);
         }
     }
 }

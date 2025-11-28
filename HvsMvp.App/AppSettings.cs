@@ -49,6 +49,12 @@ namespace HvsMvp.App
         public string DefaultOperator { get; set; } = "";
         public string WhatsAppContact { get; set; } = "";
 
+        // ===== Interface (UI) =====
+        /// <summary>
+        /// PR10: If true, skips the welcome screen on startup (operator mode).
+        /// </summary>
+        public bool SkipWelcomeScreen { get; set; } = false;
+
         /// <summary>
         /// Load settings from JSON file. If file doesn't exist, returns default settings.
         /// </summary>
@@ -121,7 +127,8 @@ namespace HvsMvp.App
                 LabName = "Trilha Gold Capital",
                 LogoPath = "",
                 DefaultOperator = "",
-                WhatsAppContact = ""
+                WhatsAppContact = "",
+                SkipWelcomeScreen = false
             };
         }
 
@@ -156,6 +163,7 @@ namespace HvsMvp.App
             LogoPath = defaults.LogoPath;
             DefaultOperator = defaults.DefaultOperator;
             WhatsAppContact = defaults.WhatsAppContact;
+            SkipWelcomeScreen = defaults.SkipWelcomeScreen;
         }
 
         /// <summary>

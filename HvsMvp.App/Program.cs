@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -7,13 +9,16 @@ namespace HvsMvp.App
 {
     internal static class Program
     {
-        // PR9: Reduced splash display time for better UX (3 seconds)
-        private const int SplashDisplayTimeMs = 3000;
+        // PR10: Reduced splash display time for better UX (2 seconds)
+        private const int SplashDisplayTimeMs = 2000;
 
         [STAThread]
         static void Main()
         {
             ApplicationConfiguration.Initialize();
+
+            // Load app settings
+            var appSettings = AppSettings.Load();
 
             // Show splash screen
             SplashScreen? splash = null;
@@ -23,36 +28,99 @@ namespace HvsMvp.App
             {
                 splash = new SplashScreen();
                 splash.ShowSplash();
-                splash.SetMaxTimeout(5000); // Safety timeout: 5 seconds max
+                splash.SetMaxTimeout(4000); // Safety timeout: 4 seconds max
             }
             catch
             {
                 // If splash fails, continue without it
             }
 
-            // Create main form (but don't show yet)
-            var mainForm = new MainForm();
+            // Wait for minimum splash time, then close it
+            Task.Run(async () =>
+            {
+                await Task.Delay(SplashDisplayTimeMs);
+                splash?.BeginInvoke(new Action(() =>
+                {
+                    try { splash?.CloseSplash(); } catch { }
+                }));
+            });
 
-            // When main form is shown, ensure splash stays for the required time
-            mainForm.Shown += async (s, e) =>
+            // PR10: Show welcome screen unless skipped
+            WelcomeScreen.WelcomeAction welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
+            string? selectedImagePath = null;
+
+            if (!appSettings.SkipWelcomeScreen)
+            {
+                // Wait for splash to close before showing welcome
+                Task.Delay(SplashDisplayTimeMs + 500).Wait();
+
+                using var welcomeScreen = new WelcomeScreen(appSettings);
+                var result = welcomeScreen.ShowDialog();
+
+                if (result == DialogResult.OK)
+                {
+                    welcomeAction = welcomeScreen.SelectedAction;
+                    selectedImagePath = welcomeScreen.SelectedImagePath;
+
+                    // Save skip preference if changed
+                    if (welcomeScreen.SkipWelcomeOnStartup != appSettings.SkipWelcomeScreen)
+                    {
+                        appSettings.SkipWelcomeScreen = welcomeScreen.SkipWelcomeOnStartup;
+                        appSettings.Save();
+                    }
+                }
+                else
+                {
+                    // User closed welcome without selecting action - exit app
+                    return;
+                }
+            }
+
+            // Handle explore action - open folder and exit or continue to main
+            if (welcomeAction == WelcomeScreen.WelcomeAction.ExploreSamplesReports)
             {
                 try
                 {
-                    // Calculate remaining time to keep splash visible
-                    var elapsedMs = (long)(DateTime.UtcNow - splashStartTime).TotalMilliseconds;
-                    var remainingMs = (int)Math.Max(0, SplashDisplayTimeMs - elapsedMs);
-
-                    if (remainingMs > 0)
+                    string exploreDir = !string.IsNullOrWhiteSpace(appSettings.ReportsDirectory)
+                        ? appSettings.ReportsDirectory
+                        : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports");
+                    Directory.CreateDirectory(exploreDir);
+                    Process.Start(new ProcessStartInfo
                     {
-                        // Wait the remaining time before closing splash
-                        await Task.Delay(remainingMs);
-                    }
-
-                    splash?.CloseSplash();
+                        FileName = exploreDir,
+                        UseShellExecute = true
+                    });
                 }
-                catch
+                catch { }
+
+                // After opening folder, show main form anyway
+                welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
+            }
+
+            // Create main form with the selected action
+            var mainForm = new MainForm();
+
+            // PR10: Apply welcome action to main form
+            mainForm.Shown += async (s, e) =>
+            {
+                // Ensure splash is closed
+                try { splash?.CloseSplash(); } catch { }
+
+                // Apply selected action
+                await Task.Delay(100); // Small delay for form to be fully ready
+
+                switch (welcomeAction)
                 {
-                    // Ignore splash close errors
+                    case WelcomeScreen.WelcomeAction.NewImageAnalysis:
+                        if (!string.IsNullOrWhiteSpace(selectedImagePath))
+                        {
+                            mainForm.LoadImageFromWelcome(selectedImagePath);
+                        }
+                        break;
+
+                    case WelcomeScreen.WelcomeAction.LiveCamera:
+                        mainForm.StartLiveFromWelcome();
+                        break;
                 }
             };
 

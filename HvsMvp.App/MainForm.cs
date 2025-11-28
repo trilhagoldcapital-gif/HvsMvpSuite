@@ -461,11 +461,11 @@ namespace HvsMvp.App
             };
             toolbarPanel3.Controls.Add(_toolbarRow3);
 
-            // PR9: Status info bar
+            // PR10: Status info bar with professional format
             _statusInfoBar = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(15, 25, 40),
+                BackColor = Color.FromArgb(12, 22, 38),
                 Padding = new Padding(8, 2, 8, 2)
             };
             topLayout.Controls.Add(_statusInfoBar, 0, 3);
@@ -473,10 +473,10 @@ namespace HvsMvp.App
             _lblStatusInfo = new Label
             {
                 Dock = DockStyle.Fill,
-                ForeColor = Color.FromArgb(180, 190, 210),
+                ForeColor = Color.FromArgb(160, 175, 195),
                 Font = new Font("Segoe UI", 8.5f),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Text = "Origem: – | Visualização: – | Alvo: – | Foco: – | Máscara: –"
+                Text = "ORIGEM: –  •  MODO: –  •  ALVO: –  •  FOCO: –  •  MÁSCARA: –"
             };
             _statusInfoBar.Controls.Add(_lblStatusInfo);
 
@@ -1068,7 +1068,8 @@ namespace HvsMvp.App
         }
         
         /// <summary>
-        /// PR9: Updates the status info bar with current state.
+        /// PR10: Updates the status info bar with current state in professional format.
+        /// Format: ORIGEM: ... • MODO: ... • ALVO: ... • FOCO: ... • MÁSCARA: ...
         /// </summary>
         private void UpdateStatusInfoBar()
         {
@@ -1113,15 +1114,16 @@ namespace HvsMvp.App
             {
                 var diag = _lastScene.Summary.Diagnostics;
                 double focusScore = diag.FocusScorePercent;
-                focus = focusScore >= 50 ? $"OK ({focusScore:F0})" : 
-                        focusScore >= 30 ? $"Atenção ({focusScore:F0})" : 
-                        $"Ruim ({focusScore:F0})";
+                focus = focusScore >= 50 ? $"OK ({focusScore:F0}%)" : 
+                        focusScore >= 30 ? $"Atenção ({focusScore:F0}%)" : 
+                        $"Ruim ({focusScore:F0}%)";
                 
                 double maskFrac = diag.ForegroundFraction * 100;
                 mask = diag.ForegroundFractionStatus ?? $"{maskFrac:F0}%";
             }
             
-            _lblStatusInfo.Text = $"Origem: {origin}  |  Visualização: {viewMode}  |  Alvo: {target}  |  Foco: {focus}  |  Máscara: {mask}";
+            // PR10: Professional format with bullet separators
+            _lblStatusInfo.Text = $"ORIGEM: {origin}  •  MODO: {viewMode}  •  ALVO: {target}  •  FOCO: {focus}  •  MÁSCARA: {mask}";
         }
         
         /// <summary>
@@ -3287,6 +3289,49 @@ namespace HvsMvp.App
             {
                 // Silent fail on startup update check
             }
+        }
+
+        /// <summary>
+        /// PR10: Load an image file from the welcome screen.
+        /// </summary>
+        public void LoadImageFromWelcome(string imagePath)
+        {
+            if (string.IsNullOrWhiteSpace(imagePath) || !System.IO.File.Exists(imagePath))
+            {
+                AppendLog($"Arquivo de imagem não encontrado: {imagePath}");
+                return;
+            }
+
+            try
+            {
+                using var bmp = new Bitmap(imagePath);
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = (Bitmap)bmp.Clone();
+                _zoomFactor = 1.0f;
+                _lastBaseImageClone?.Dispose();
+                _lastBaseImageClone = (Bitmap)bmp.Clone();
+                _lastScene = null;
+                _currentImageOrigin = ImageOrigin.ImageFile;
+                _frameFrozen = false;
+                _selectiveModeActive = false;
+                SetViewMode(ViewMode.Original);
+                ApplyZoom();
+                AppendLog($"Imagem carregada: {System.IO.Path.GetFileName(imagePath)}");
+                UpdateButtonEnabledStates();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao carregar imagem: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PR10: Start live camera mode from the welcome screen.
+        /// </summary>
+        public void StartLiveFromWelcome()
+        {
+            // Trigger the live button click
+            BtnLive_Click(this, EventArgs.Empty);
         }
     }
 }
