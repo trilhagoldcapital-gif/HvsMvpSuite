@@ -467,6 +467,41 @@ namespace HvsMvp.App
         public const double LowConfidenceGapThreshold = 0.05;
 
         /// <summary>
+        /// PR8: Limiar de confiança para classificar como alta confiança.
+        /// </summary>
+        public const double HighConfidenceThreshold = 0.7;
+
+        /// <summary>
+        /// PR8: Fator de escurecimento do fundo no modo X-ray.
+        /// </summary>
+        public const double XrayBackgroundDarkenFactor = 0.4;
+
+        /// <summary>
+        /// PR8: Opacidade do overlay para alta confiança.
+        /// </summary>
+        public const double HighConfidenceOverlayAlpha = 0.85;
+
+        /// <summary>
+        /// PR8: Opacidade do overlay para baixa confiança.
+        /// </summary>
+        public const double LowConfidenceOverlayAlpha = 0.45;
+
+        /// <summary>
+        /// PR8: Fator de blend para cor de baixa confiança (mistura com cinza).
+        /// </summary>
+        public const double LowConfidenceColorBlendFactor = 0.5;
+
+        /// <summary>
+        /// PR8: Opacidade do overlay para fundo (não X-ray).
+        /// </summary>
+        public const double BackgroundOverlayAlpha = 0.6;
+
+        // Constantes para conversão RGB para escala de cinza (ITU-R BT.601)
+        private const double GrayscaleRedWeight = 0.299;
+        private const double GrayscaleGreenWeight = 0.587;
+        private const double GrayscaleBlueWeight = 0.114;
+
+        /// <summary>
         /// PR8: Gera visualização seletiva modo X-ray.
         /// Fundo convertido para escala de cinza, apenas o alvo em cor forte.
         /// </summary>
@@ -502,9 +537,9 @@ namespace HvsMvp.App
             // Cores para o alvo baseado no tipo de material
             Color overlayColor = GetMaterialColor(targetMaterialId, materialType);
             Color lowConfidenceColor = Color.FromArgb(
-                (int)(overlayColor.R * 0.5 + 128 * 0.5),
-                (int)(overlayColor.G * 0.5 + 128 * 0.5),
-                (int)(overlayColor.B * 0.5 + 128 * 0.5));
+                (int)(overlayColor.R * LowConfidenceColorBlendFactor + 128 * LowConfidenceColorBlendFactor),
+                (int)(overlayColor.G * LowConfidenceColorBlendFactor + 128 * LowConfidenceColorBlendFactor),
+                (int)(overlayColor.B * LowConfidenceColorBlendFactor + 128 * LowConfidenceColorBlendFactor));
 
             var validPixels = BuildValidPixelMask(result.Labels, targetMaterialId, w, h, confidenceThreshold);
             var resultBitmap = new Bitmap(w, h);
@@ -514,9 +549,6 @@ namespace HvsMvp.App
             int lowConfPixels = 0;
             int totalSamplePixels = 0;
 
-            double overlayAlphaHigh = 0.85;
-            double overlayAlphaLow = 0.45;
-
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
@@ -524,7 +556,7 @@ namespace HvsMvp.App
                     var src = baseImage.GetPixel(x, y);
 
                     // Convert to grayscale for X-ray background
-                    int gray = (int)(0.299 * src.R + 0.587 * src.G + 0.114 * src.B);
+                    int gray = (int)(GrayscaleRedWeight * src.R + GrayscaleGreenWeight * src.G + GrayscaleBlueWeight * src.B);
                     Color grayColor = Color.FromArgb(gray, gray, gray);
 
                     PixelLabel? lbl = null;
@@ -536,7 +568,7 @@ namespace HvsMvp.App
                     if (lbl == null || !lbl.IsSample)
                     {
                         // Background: darker grayscale
-                        int darkGray = (int)(gray * 0.4);
+                        int darkGray = (int)(gray * XrayBackgroundDarkenFactor);
                         resultBitmap.SetPixel(x, y, Color.FromArgb(darkGray, darkGray, darkGray));
                         continue;
                     }
@@ -559,9 +591,9 @@ namespace HvsMvp.App
                         {
                             highConfPixels++;
                             // High confidence: strong overlay color
-                            int r = (int)(gray * (1 - overlayAlphaHigh) + overlayColor.R * overlayAlphaHigh);
-                            int g = (int)(gray * (1 - overlayAlphaHigh) + overlayColor.G * overlayAlphaHigh);
-                            int b = (int)(gray * (1 - overlayAlphaHigh) + overlayColor.B * overlayAlphaHigh);
+                            int r = (int)(gray * (1 - HighConfidenceOverlayAlpha) + overlayColor.R * HighConfidenceOverlayAlpha);
+                            int g = (int)(gray * (1 - HighConfidenceOverlayAlpha) + overlayColor.G * HighConfidenceOverlayAlpha);
+                            int b = (int)(gray * (1 - HighConfidenceOverlayAlpha) + overlayColor.B * HighConfidenceOverlayAlpha);
                             resultBitmap.SetPixel(x, y, Color.FromArgb(r, g, b));
                         }
                         else
@@ -570,17 +602,17 @@ namespace HvsMvp.App
                             if (showUncertainty)
                             {
                                 // Low confidence: lighter/translucent overlay
-                                int r = (int)(gray * (1 - overlayAlphaLow) + lowConfidenceColor.R * overlayAlphaLow);
-                                int g = (int)(gray * (1 - overlayAlphaLow) + lowConfidenceColor.G * overlayAlphaLow);
-                                int b = (int)(gray * (1 - overlayAlphaLow) + lowConfidenceColor.B * overlayAlphaLow);
+                                int r = (int)(gray * (1 - LowConfidenceOverlayAlpha) + lowConfidenceColor.R * LowConfidenceOverlayAlpha);
+                                int g = (int)(gray * (1 - LowConfidenceOverlayAlpha) + lowConfidenceColor.G * LowConfidenceOverlayAlpha);
+                                int b = (int)(gray * (1 - LowConfidenceOverlayAlpha) + lowConfidenceColor.B * LowConfidenceOverlayAlpha);
                                 resultBitmap.SetPixel(x, y, Color.FromArgb(r, g, b));
                             }
                             else
                             {
                                 // Without uncertainty visualization, treat as high confidence
-                                int r = (int)(gray * (1 - overlayAlphaHigh) + overlayColor.R * overlayAlphaHigh);
-                                int g = (int)(gray * (1 - overlayAlphaHigh) + overlayColor.G * overlayAlphaHigh);
-                                int b = (int)(gray * (1 - overlayAlphaHigh) + overlayColor.B * overlayAlphaHigh);
+                                int r = (int)(gray * (1 - HighConfidenceOverlayAlpha) + overlayColor.R * HighConfidenceOverlayAlpha);
+                                int g = (int)(gray * (1 - HighConfidenceOverlayAlpha) + overlayColor.G * HighConfidenceOverlayAlpha);
+                                int b = (int)(gray * (1 - HighConfidenceOverlayAlpha) + overlayColor.B * HighConfidenceOverlayAlpha);
                                 resultBitmap.SetPixel(x, y, Color.FromArgb(r, g, b));
                             }
                         }
@@ -661,16 +693,15 @@ namespace HvsMvp.App
             int totalSamplePixels = 0;
 
             Color bgOverlay = Color.FromArgb(0, 80, 200);
-            double bgAlpha = 0.6;
-            double overlayAlphaHigh = xrayMode ? 0.85 : 0.7;
-            double overlayAlphaLow = xrayMode ? 0.45 : 0.4;
+            double overlayAlphaHigh = xrayMode ? HighConfidenceOverlayAlpha : 0.7;
+            double overlayAlphaLow = xrayMode ? LowConfidenceOverlayAlpha : 0.4;
 
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
                     var src = baseImage.GetPixel(x, y);
-                    int gray = (int)(0.299 * src.R + 0.587 * src.G + 0.114 * src.B);
+                    int gray = (int)(GrayscaleRedWeight * src.R + GrayscaleGreenWeight * src.G + GrayscaleBlueWeight * src.B);
 
                     PixelLabel? lbl = null;
                     if (x < result.Labels.GetLength(0) && y < result.Labels.GetLength(1))
@@ -682,14 +713,14 @@ namespace HvsMvp.App
                     {
                         if (xrayMode)
                         {
-                            int darkGray = (int)(gray * 0.4);
+                            int darkGray = (int)(gray * XrayBackgroundDarkenFactor);
                             resultBitmap.SetPixel(x, y, Color.FromArgb(darkGray, darkGray, darkGray));
                         }
                         else
                         {
-                            int rBg = (int)(src.R * (1 - bgAlpha) + bgOverlay.R * bgAlpha);
-                            int gBg = (int)(src.G * (1 - bgAlpha) + bgOverlay.G * bgAlpha);
-                            int bBg = (int)(src.B * (1 - bgAlpha) + bgOverlay.B * bgAlpha);
+                            int rBg = (int)(src.R * (1 - BackgroundOverlayAlpha) + bgOverlay.R * BackgroundOverlayAlpha);
+                            int gBg = (int)(src.G * (1 - BackgroundOverlayAlpha) + bgOverlay.G * BackgroundOverlayAlpha);
+                            int bBg = (int)(src.B * (1 - BackgroundOverlayAlpha) + bgOverlay.B * BackgroundOverlayAlpha);
                             resultBitmap.SetPixel(x, y, Color.FromArgb(rBg, gBg, bBg));
                         }
                         continue;
@@ -772,8 +803,7 @@ namespace HvsMvp.App
             }
 
             // Fallback: usar confiança direta como proxy
-            // Alta confiança se MaterialConfidence > 0.7
-            return lbl.MaterialConfidence >= 0.7;
+            return lbl.MaterialConfidence >= HighConfidenceThreshold;
         }
 
         /// <summary>
