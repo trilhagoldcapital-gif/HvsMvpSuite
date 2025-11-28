@@ -6,7 +6,7 @@ using System.Windows.Forms;
 namespace HvsMvp.App
 {
     /// <summary>
-    /// Panel that displays quality checklist with FocusScore, Mask score, and Clipping status.
+    /// PR9: Enhanced quality checklist panel with improved styling.
     /// </summary>
     public class QualityChecklistPanel : Panel
     {
@@ -32,31 +32,31 @@ namespace HvsMvp.App
 
         private void InitializeComponent()
         {
-            BackColor = Color.FromArgb(15, 22, 35);
+            BackColor = Color.FromArgb(12, 20, 32);
             BorderStyle = BorderStyle.FixedSingle;
-            Size = new Size(200, 170);
-            Padding = new Padding(8);
+            Size = new Size(200, 160);
+            Padding = new Padding(8, 4, 8, 4);
 
             _lblTitle = new Label
             {
                 Text = "📋 Checklist de Qualidade",
-                Location = new Point(8, 8),
+                Location = new Point(8, 6),
                 Size = new Size(180, 20),
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.FromArgb(200, 210, 230)
             };
             Controls.Add(_lblTitle);
 
-            _lblFocusStatus = CreateStatusLabel(32);
-            _lblMaskStatus = CreateStatusLabel(54);
-            _lblExposureStatus = CreateStatusLabel(76);
-            _lblOverallStatus = CreateStatusLabel(102);
+            _lblFocusStatus = CreateStatusLabel(30);
+            _lblMaskStatus = CreateStatusLabel(50);
+            _lblExposureStatus = CreateStatusLabel(70);
+            _lblOverallStatus = CreateStatusLabel(94);
             _lblOverallStatus.Font = new Font("Segoe UI", 9, FontStyle.Bold);
 
             _lblWarnings = new Label
             {
-                Location = new Point(8, 126),
-                Size = new Size(180, 40),
+                Location = new Point(8, 118),
+                Size = new Size(180, 36),
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.FromArgb(220, 180, 80),
                 AutoEllipsis = true
@@ -77,8 +77,8 @@ namespace HvsMvp.App
             return new Label
             {
                 Location = new Point(8, yPosition),
-                Size = new Size(180, 20),
-                Font = new Font("Segoe UI", 9),
+                Size = new Size(180, 18),
+                Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.Gainsboro
             };
         }
@@ -97,7 +97,7 @@ namespace HvsMvp.App
             // Focus status
             double focusPercent = diagnostics.FocusScorePercent;
             var focusStatus = GetStatus(focusPercent, FocusGoodThreshold * 100, FocusWarningThreshold * 100);
-            _lblFocusStatus.Text = $"Foco: {focusStatus.Icon} {focusStatus.Text} ({focusPercent:F1})";
+            _lblFocusStatus.Text = $"Foco: {focusStatus.Icon} {focusStatus.Text} ({focusPercent:F0})";
             _lblFocusStatus.ForeColor = focusStatus.Color;
 
             // Mask status (using foreground fraction and status)
@@ -109,7 +109,7 @@ namespace HvsMvp.App
             // Exposure status
             double exposureScore = diagnostics.ExposureScore;
             var exposureStatus = GetStatus(exposureScore, ExposureGoodThreshold, ExposureWarningThreshold);
-            _lblExposureStatus.Text = $"Exposição: {exposureStatus.Icon} {exposureStatus.Text} ({exposureScore:F1})";
+            _lblExposureStatus.Text = $"Exposição: {exposureStatus.Icon} {exposureStatus.Text} ({exposureScore:F0})";
             _lblExposureStatus.ForeColor = exposureStatus.Color;
 
             // Overall status
@@ -135,13 +135,13 @@ namespace HvsMvp.App
         /// </summary>
         public void ClearChecklist()
         {
-            _lblFocusStatus.Text = "Foco: --";
+            _lblFocusStatus.Text = "Foco: –";
             _lblFocusStatus.ForeColor = Color.Gray;
 
-            _lblMaskStatus.Text = "Máscara: --";
+            _lblMaskStatus.Text = "Máscara: –";
             _lblMaskStatus.ForeColor = Color.Gray;
 
-            _lblExposureStatus.Text = "Exposição: --";
+            _lblExposureStatus.Text = "Exposição: –";
             _lblExposureStatus.ForeColor = Color.Gray;
 
             _lblOverallStatus.Text = "Geral: Aguardando análise";
