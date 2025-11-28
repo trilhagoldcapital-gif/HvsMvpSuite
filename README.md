@@ -64,17 +64,26 @@ dotnet run --project HvsMvp.App
 
 ```
 HvsMvpSuite/
-├── HvsMvp.App/                    # Aplicação principal
-│   ├── MainForm.cs                # Interface principal
-│   ├── HvsAnalysisService.cs      # Núcleo de análise HVS
-│   ├── SampleMask.cs              # Serviço de segmentação
-│   ├── VisualizationService.cs    # Renderização de máscaras
-│   ├── HvsConfig.cs               # Modelos de configuração
-│   ├── SampleAnalysisModels.cs    # Modelos de resultado
-│   ├── hvs-config.json            # Configuração de materiais
+├── HvsMvp.App/                       # Aplicação principal WinForms
+│   ├── MainForm.cs                   # Interface principal
+│   ├── HvsAnalysisService.cs         # Núcleo de análise HVS (metais/cristais/gemas)
+│   ├── SampleMaskService.cs          # Serviço de segmentação de amostra
+│   ├── SampleMaskClass.cs            # Modelo de máscara por pixel
+│   ├── SampleFullAnalysisResult.cs   # Modelos de resultado de análise
+│   ├── FullSceneAnalysis.cs          # Contêiner de análise de cena completa
+│   ├── PixelLabel.cs                 # Rótulo por pixel (material, confiança, HSV)
+│   ├── ParticleRecord.cs             # Registro de partícula/cluster
+│   ├── VisualizationService.cs       # Renderização de máscaras e overlays
+│   ├── MicroscopeCameraService.cs    # Captura de vídeo via OpenCvSharp
+│   ├── ContinuousAnalysisController.cs # Análise contínua em background
+│   ├── ImageDiagnosticsService.cs    # Diagnósticos de qualidade de imagem
+│   ├── HvsConfig.cs                  # Modelos de configuração JSON
+│   ├── hvs-config.json               # Configuração de materiais e parâmetros
 │   └── ...
-├── HvsMvp.Debug/                  # Projeto de debug/testes
-└── docs/                          # Documentação técnica
+├── HvsMvp.Debug/                     # Projeto de debug/testes
+├── docs/                             # Documentação técnica
+│   └── MicroLab-detalhado.md         # Documentação técnica detalhada
+└── _deprecated_off/                  # Código depreciado (não compilado)
 ```
 
 ## Configuração de Materiais
