@@ -13,6 +13,10 @@ namespace HvsMvp.App
         // PR10: Splash display time
         private const int SplashDisplayTimeMs = 2000;
         
+        // PR14: Splash timing constants
+        private const int SplashCloseAnimationDelayMs = 400;
+        private const int SplashMaxWaitMs = 2000;
+        
         // PR14: Startup log file path
         private static readonly string StartupLogPath = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory, "logs", "startup.log");
@@ -232,11 +236,11 @@ namespace HvsMvp.App
                 int remaining = SplashDisplayTimeMs - elapsed + 200;
                 if (remaining > 0)
                 {
-                    Thread.Sleep(Math.Min(remaining, 2000)); // Cap at 2 seconds
+                    Thread.Sleep(Math.Min(remaining, SplashMaxWaitMs));
                 }
                 
                 splash.CloseSplash();
-                Thread.Sleep(400); // Let close animation complete
+                Thread.Sleep(SplashCloseAnimationDelayMs); // Let close animation complete
             }
             catch
             {
@@ -252,7 +256,9 @@ namespace HvsMvp.App
             try
             {
                 // Get the working area of all screens combined
-                Rectangle workingArea = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
+                // Use SystemInformation.PrimaryMonitorSize as fallback if screen info unavailable
+                Rectangle workingArea = Screen.PrimaryScreen?.WorkingArea ?? 
+                    new Rectangle(0, 0, SystemInformation.PrimaryMonitorSize.Width, SystemInformation.PrimaryMonitorSize.Height);
                 
                 // For multi-monitor setups, get the combined working area
                 foreach (var screen in Screen.AllScreens)
