@@ -84,7 +84,7 @@ namespace HvsMvp.App
                 "PLATINUM" => Platinum,
 
                 "PD" => Palladium,
-                "PALADIA" => Palladium,
+                "PALADIO" => Palladium,
                 "PALÁDIO" => Palladium,
 
                 "RH" => Rhodium,

@@ -84,9 +84,10 @@ namespace HvsMvp.App
             {
                 // Circular range (crosses 0/360)
                 if (h >= HMin || h <= HMax) return 1.0;
-                double distMin = Math.Min(Math.Abs(h - HMin), 360 - Math.Abs(h - HMin));
-                double distMax = Math.Min(Math.Abs(h - HMax), 360 - Math.Abs(h - HMax));
-                double dist = Math.Min(distMin, distMax);
+                // Calculate circular distance properly
+                double distToMin = h > HMin ? h - HMin : 360 - HMin + h;
+                double distFromMax = h < HMax ? HMax - h : 360 - h + HMax;
+                double dist = Math.Min(distToMin, distFromMax);
                 return Math.Max(0, 1.0 - dist / 60.0);
             }
         }
@@ -107,6 +108,13 @@ namespace HvsMvp.App
         // Constants for particle segmentation
         private const int MinParticleSizeAbsolute = 20;
         private const int MinParticleSizeDivisor = 50000;
+
+        // Constants for material threshold exemptions (always include regardless of percentage)
+        private static readonly HashSet<string> PrimaryMetalsAlwaysIncluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Au", "Pt"
+        };
+        private const double MinMaterialPercentageThreshold = 0.0001; // 0.01%
 
         public HvsAnalysisService(HvsConfig config)
         {
@@ -750,8 +758,8 @@ namespace HvsMvp.App
                 long count = kvp.Value;
                 double pct = (double)count / totalSamplePixels;
 
-                // Ignorar se a fração for muito baixa (< 0.01%)
-                if (pct < 0.0001 && matId != "Au" && matId != "Pt")
+                // Ignorar se a fração for muito baixa, exceto para metais primários
+                if (pct < MinMaterialPercentageThreshold && !PrimaryMetalsAlwaysIncluded.Contains(matId))
                     continue;
 
                 if (metalInfo.TryGetValue(matId, out var metal))
