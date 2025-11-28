@@ -49,10 +49,15 @@ namespace HvsMvp.App
         /// Partículas com menos pixels são ignoradas na visualização.
         /// </summary>
         public const int MinPixelsForSelectiveVisualization = 2;
+
+        // Static arrays for 8-connectivity (avoid repeated allocation)
+        private static readonly int[] Dx8 = { -1, 0, 1, -1, 1, -1, 0, 1 };
+        private static readonly int[] Dy8 = { -1, -1, -1, 0, 0, 1, 1, 1 };
+
         /// <summary>
         /// Gera uma imagem em que:
-        /// - Pixels de fundo (IsSample=false) s�o sobrepostos por azul transl�cido.
-        /// - Pixels de amostra s�o mantidos como na imagem base.
+        /// - Pixels de fundo (IsSample=false) são sobrepostos por azul translúcido.
+        /// - Pixels de amostra são mantidos como na imagem base.
         /// </summary>
         public static Bitmap BuildBackgroundMaskedView(
             Bitmap baseImage,
@@ -235,9 +240,7 @@ namespace HvsMvp.App
             var validPixels = new bool[w, h];
             var visited = new bool[w, h];
 
-            // Simple connected component analysis to filter small clusters
-            int[] dx = { -1, 0, 1, -1, 1, -1, 0, 1 };
-            int[] dy = { -1, -1, -1, 0, 0, 1, 1, 1 };
+            // Use static arrays for 8-connectivity
             var queue = new System.Collections.Generic.Queue<(int x, int y)>();
             var currentCluster = new System.Collections.Generic.List<(int x, int y)>();
 
@@ -278,8 +281,8 @@ namespace HvsMvp.App
 
                         for (int k = 0; k < 8; k++)
                         {
-                            int nx = cx + dx[k];
-                            int ny = cy + dy[k];
+                            int nx = cx + Dx8[k];
+                            int ny = cy + Dy8[k];
 
                             if (nx < 0 || ny < 0 || nx >= w || ny >= h)
                                 continue;

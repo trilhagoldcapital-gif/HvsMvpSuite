@@ -58,6 +58,8 @@ namespace HvsMvp.App
             _sceneAnalyzer = bmp =>
             {
                 var (analysis, mask, maskPreview) = analyzer(bmp);
+                // Note: Legacy mode uses minimal placeholder for Labels (1x1) to avoid wasteful allocation
+                // Selective analysis won't work properly in legacy mode, but basic analysis will
                 return new FullSceneAnalysis
                 {
                     Summary = analysis,
@@ -65,7 +67,7 @@ namespace HvsMvp.App
                     MaskPreview = maskPreview,
                     Width = bmp.Width,
                     Height = bmp.Height,
-                    Labels = new PixelLabel[bmp.Width, bmp.Height] // Note: legacy mode won't have full labels
+                    Labels = new PixelLabel[1, 1] // Placeholder - legacy mode doesn't provide full labels
                 };
             };
             _intervalMs = intervalMs > 0 ? intervalMs : 800;

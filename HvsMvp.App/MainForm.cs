@@ -1573,8 +1573,12 @@ namespace HvsMvp.App
                     string sel = _cbTarget.SelectedItem.ToString() ?? "";
                     if (sel.Contains(":"))
                     {
-                        targetName = sel.Split(':')[1].Trim();
-                        targetId = ExtractMaterialIdFromName(targetName);
+                        var parts = sel.Split(':');
+                        if (parts.Length > 1)
+                        {
+                            targetName = parts[1].Trim();
+                            targetId = ExtractMaterialIdFromName(targetName);
+                        }
                     }
                 }
 
