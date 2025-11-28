@@ -20,16 +20,25 @@ namespace HvsMvp.App
             RunFullAnalysis(Bitmap bmp, string? imagePath)
         {
             var scene = AnalyzeScene(bmp, imagePath);
-            // Convert nullable mask to non-nullable mask
+            // AnalyzeScene always populates the mask fully, so we can safely convert
+            // The nullable type in FullSceneAnalysis is for API flexibility, but internally it's always populated
+            int w = scene.Width;
+            int h = scene.Height;
             var nullableMask = scene.Mask;
-            var mask = new SampleMaskClass[scene.Width, scene.Height];
-            for (int y = 0; y < scene.Height; y++)
+            var mask = new SampleMaskClass[w, h];
+            
+            // Only iterate if we have a valid mask
+            if (nullableMask.GetLength(0) == w && nullableMask.GetLength(1) == h)
             {
-                for (int x = 0; x < scene.Width; x++)
+                for (int y = 0; y < h; y++)
                 {
-                    mask[x, y] = nullableMask[x, y] ?? new SampleMaskClass { IsSample = false };
+                    for (int x = 0; x < w; x++)
+                    {
+                        mask[x, y] = nullableMask[x, y] ?? new SampleMaskClass { IsSample = false };
+                    }
                 }
             }
+            
             return (scene.Summary, mask, scene.MaskPreview);
         }
 
