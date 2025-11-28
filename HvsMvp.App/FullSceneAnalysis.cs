@@ -3,29 +3,29 @@ using System.Drawing;
 namespace HvsMvp.App
 {
     /// <summary>
-    /// Resultado completo de uma análise de cena HVS.
+    /// Complete HVS scene analysis result.
     /// </summary>
     public class FullSceneAnalysis
     {
         /// <summary>
-        /// Resumo estatístico (metais/cristais/gemas, diagnósticos).
+        /// Statistical summary (metals/crystals/gems, diagnostics).
         /// </summary>
-        public SampleFullAnalysisResult Summary { get; set; } = null!;
+        public SampleFullAnalysisResult Summary { get; set; } = new SampleFullAnalysisResult();
 
         /// <summary>
-        /// Rótulos por pixel, mesmo tamanho da imagem analisada.
+        /// Per-pixel labels, same size as analyzed image.
         /// </summary>
-        public PixelLabel[,] Labels { get; set; } = null!;
+        public PixelLabel[,] Labels { get; set; } = new PixelLabel[0, 0];
 
         /// <summary>
-        /// Máscara de amostra/fundo.
+        /// Sample/background mask.
         /// </summary>
-        public SampleMaskClass?[,] Mask { get; set; } = null!;
+        public SampleMaskClass?[,] Mask { get; set; } = new SampleMaskClass?[0, 0];
 
         /// <summary>
-        /// Preview visual da máscara.
+        /// Visual mask preview.
         /// </summary>
-        public Bitmap MaskPreview { get; set; } = null!;
+        public Bitmap MaskPreview { get; set; } = new Bitmap(1, 1);
 
         public int Width { get; set; }
         public int Height { get; set; }

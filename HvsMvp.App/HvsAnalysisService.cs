@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -9,11 +9,13 @@ using System.Text.Json;
 namespace HvsMvp.App
 {
     /// <summary>
-    /// Núcleo de análise HVS.
-    /// - Usa SampleMaskService para separar amostra/fundo.
-    /// - Classifica cada pixel da amostra em Metal / Cristal / Gema usando faixas cor_hsv do HvsConfig.
-    /// - Gera estatísticas globais (SampleFullAnalysisResult).
-    /// - Gera um LabelMap (PixelLabel[,]) com a "verdade" por pixel.
+    /// Core HVS analysis service.
+    /// - Uses SampleMaskService to separate sample from background.
+    /// - Classifies each sample pixel as Metal / Crystal / Gem using HSV ranges from HvsConfig.
+    /// - Generates global statistics (SampleFullAnalysisResult).
+    /// - Generates a LabelMap (PixelLabel[,]) with per-pixel classification.
+    /// 
+    /// Special focus on Gold (Au) vs Platinum (Pt) differentiation using robust heuristics.
     /// </summary>
     public class HvsAnalysisService
     {
@@ -29,12 +31,30 @@ namespace HvsMvp.App
         private MatEntry[] _metals = Array.Empty<MatEntry>();
         private MatEntry[] _crystals = Array.Empty<MatEntry>();
         private MatEntry[] _gems = Array.Empty<MatEntry>();
+        
+        // Index cache for quick lookup
+        private int _auIndex = -1;
+        private int _ptIndex = -1;
 
-        // Limiar anti-ruído e confiança
-        private readonly double _minSat = 0.08;
-        private readonly double _minVal = 0.06;
-        private readonly double _maxVal = 0.97;
-        private readonly double _minScorePixel = 0.55;
+        // ===== CONFIGURABLE THRESHOLDS =====
+        
+        /// <summary>Minimum saturation to consider pixel for classification.</summary>
+        public double MinSaturation { get; set; } = 0.05;
+        
+        /// <summary>Minimum value (brightness) to consider pixel for classification.</summary>
+        public double MinValue { get; set; } = 0.08;
+        
+        /// <summary>Maximum value to avoid saturated white pixels.</summary>
+        public double MaxValue { get; set; } = 0.98;
+        
+        /// <summary>Minimum score for pixel classification.</summary>
+        public double MinScorePixel { get; set; } = 0.45;
+        
+        /// <summary>Gold heuristic boost score.</summary>
+        public double GoldBoostScore { get; set; } = 0.85;
+        
+        /// <summary>PGM heuristic boost score.</summary>
+        public double PgmBoostScore { get; set; } = 0.70;
 
         public HvsAnalysisService(HvsConfig config)
         {
@@ -42,23 +62,30 @@ namespace HvsMvp.App
             _metals = BuildEntries(_config.Materials?.Metais, 0);
             _crystals = BuildEntries(_config.Materials?.Cristais, 1);
             _gems = BuildEntries(_config.Materials?.Gemas, 2);
+            
+            // Cache indices for Au and Pt for quick lookup
+            _auIndex = Array.FindIndex(_metals, m => m.Id.Equals("Au", StringComparison.OrdinalIgnoreCase));
+            _ptIndex = Array.FindIndex(_metals, m => m.Id.Equals("Pt", StringComparison.OrdinalIgnoreCase));
         }
 
         private MatEntry[] BuildEntries(IEnumerable<HvsMaterial>? list, int type)
         {
             if (list == null) return Array.Empty<MatEntry>();
-            var result = new List<MatEntry>();
+            
+            // Use dictionary to deduplicate by ID (keep first occurrence with valid HSV)
+            var seen = new Dictionary<string, MatEntry>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var m in list)
             {
                 if (string.IsNullOrWhiteSpace(m.Id)) continue;
+                if (seen.ContainsKey(m.Id)) continue; // Skip duplicates
                 if (!TryGetHsvRangeNormalized(m, out var h, out var s, out var v, out bool hWrap)) continue;
 
                 double hMid = MidHue(h.Min, h.Max, hWrap);
                 double sHalf = Math.Max(1e-6, (s.Max - s.Min) / 2.0);
                 double vHalf = Math.Max(1e-6, (v.Max - v.Min) / 2.0);
 
-                result.Add(new MatEntry(
+                seen[m.Id] = new MatEntry(
                     Id: m.Id!,
                     Name: m.Nome ?? m.Id!,
                     Group: m.Grupo ?? "",
@@ -66,19 +93,25 @@ namespace HvsMvp.App
                     H: h, HWrap: hWrap,
                     S: s, V: v,
                     HMid: hMid, SHalf: sHalf, VHalf: vHalf
-                ));
+                );
             }
 
-            return result.ToArray();
+            return seen.Values.ToArray();
         }
 
-        public (SampleFullAnalysisResult analysis, SampleMaskClass[,] mask, Bitmap maskPreview)
+        /// <summary>
+        /// Run full analysis and return tuple with result, mask, and preview.
+        /// </summary>
+        public (SampleFullAnalysisResult analysis, SampleMaskClass?[,] mask, Bitmap maskPreview)
             RunFullAnalysis(Bitmap bmp, string? imagePath)
         {
             var scene = AnalyzeScene(bmp, imagePath);
             return (scene.Summary, scene.Mask, scene.MaskPreview);
         }
 
+        /// <summary>
+        /// Analyze a complete scene/image and return full analysis results.
+        /// </summary>
         public FullSceneAnalysis AnalyzeScene(Bitmap bmp, string? imagePath)
         {
             using var src24 = Ensure24bpp(bmp);
@@ -123,7 +156,7 @@ namespace HvsMvp.App
                             var lbl = new PixelLabel();
                             labels[x, y] = lbl;
 
-                            // Padrão: fundo
+                            // Default: background
                             lbl.IsSample = false;
                             lbl.MaterialType = PixelMaterialType.Background;
                             lbl.MaterialId = null;
@@ -137,7 +170,7 @@ namespace HvsMvp.App
                             lbl.IsSample = true;
                             lbl.MaterialType = PixelMaterialType.None;
 
-                            sampleCount++;
+                            System.Threading.Interlocked.Increment(ref sampleCount);
 
                             int off = row + x * 3;
                             byte B = buf[off + 0], G = buf[off + 1], R = buf[off + 2];
@@ -145,6 +178,7 @@ namespace HvsMvp.App
                             int gray = (int)(0.299 * R + 0.587 * G + 0.114 * B);
                             if (gray < 5 || gray > 250) acc.Clip++;
 
+                            // Calculate gradient for focus score
                             if (x > 0 && x < w - 1 && y > 0 && y < h - 1)
                             {
                                 int offL = row + (x - 1) * 3;
@@ -167,70 +201,85 @@ namespace HvsMvp.App
                             lbl.S = S;
                             lbl.V = V;
 
-                            if (S < _minSat || V < _minVal || V > _maxVal)
-                                continue;
+                            // Apply heuristics FIRST to determine if this is clearly gold or PGM
+                            bool looksLikeGold = LooksLikeGold(R, G, B, H, S, V);
+                            bool looksLikePgm = LooksLikePgm(R, G, B, H, S, V);
 
                             double bestScore = 0;
-                            int bestType = -1, bestIndex = -1;
+                            int bestType = -1;
+                            int bestIndex = -1;
 
-                            EvaluateList(H, S, V, _metals, ref bestScore, ref bestType, ref bestIndex, 0);
-                            EvaluateList(H, S, V, _crystals, ref bestScore, ref bestType, ref bestIndex, 1);
-                            EvaluateList(H, S, V, _gems, ref bestScore, ref bestType, ref bestIndex, 2);
-
-                            bool goldHeuristic = DetectGoldPixel(R, G, B, H, S, V);
-                            bool pgmHeuristic = DetectPgmPixel(R, G, B, H, S, V);
-
-                            // Reforça ouro em cenário ambíguo
-                            if (goldHeuristic)
+                            // If gold heuristic fires strongly, prioritize Au
+                            if (looksLikeGold && _auIndex >= 0)
                             {
-                                int auIndex = Array.FindIndex(_metals, m => m.Id.Equals("Au", StringComparison.OrdinalIgnoreCase));
-                                if (auIndex >= 0)
+                                bestScore = GoldBoostScore;
+                                bestType = 0;
+                                bestIndex = _auIndex;
+                                
+                                // Still evaluate other materials but with gold priority
+                                double altScore = 0;
+                                int altType = -1, altIndex = -1;
+                                EvaluateListExcluding(H, S, V, _metals, ref altScore, ref altType, ref altIndex, 0, _auIndex);
+                                
+                                // Only override if alternative is significantly better
+                                if (altScore > bestScore + 0.2)
                                 {
-                                    if (bestType == 0 && bestIndex != auIndex && bestScore < _minScorePixel + 0.25)
-                                    {
-                                        bestType = 0;
-                                        bestIndex = auIndex;
-                                        bestScore = Math.Max(bestScore, _minScorePixel + 0.25);
-                                    }
-                                    else if (bestScore < _minScorePixel)
-                                    {
-                                        bestType = 0;
-                                        bestIndex = auIndex;
-                                        bestScore = _minScorePixel + 0.25;
-                                    }
+                                    bestScore = altScore;
+                                    bestType = altType;
+                                    bestIndex = altIndex;
                                 }
                             }
-                            else if (pgmHeuristic)
+                            // If PGM heuristic fires and NOT gold, prioritize Pt
+                            else if (looksLikePgm && !looksLikeGold && _ptIndex >= 0)
                             {
-                                int pgIndex = Array.FindIndex(_metals, m =>
-                                    !string.IsNullOrEmpty(m.Group) &&
-                                    m.Group.ToLower().Contains("pgm"));
-                                if (pgIndex >= 0 && bestScore < _minScorePixel + 0.15)
+                                bestScore = PgmBoostScore;
+                                bestType = 0;
+                                bestIndex = _ptIndex;
+                                
+                                // Evaluate alternatives
+                                double altScore = 0;
+                                int altType = -1, altIndex = -1;
+                                EvaluateList(H, S, V, _crystals, ref altScore, ref altType, ref altIndex, 1);
+                                EvaluateList(H, S, V, _gems, ref altScore, ref altType, ref altIndex, 2);
+                                
+                                // Only override if alternative is significantly better
+                                if (altScore > bestScore + 0.15)
                                 {
-                                    bestType = 0;
-                                    bestIndex = pgIndex;
-                                    bestScore = Math.Max(bestScore, _minScorePixel + 0.15);
+                                    bestScore = altScore;
+                                    bestType = altType;
+                                    bestIndex = altIndex;
+                                }
+                            }
+                            else
+                            {
+                                // Standard evaluation - check all materials
+                                if (S >= MinSaturation && V >= MinValue && V <= MaxValue)
+                                {
+                                    EvaluateList(H, S, V, _metals, ref bestScore, ref bestType, ref bestIndex, 0);
+                                    EvaluateList(H, S, V, _crystals, ref bestScore, ref bestType, ref bestIndex, 1);
+                                    EvaluateList(H, S, V, _gems, ref bestScore, ref bestType, ref bestIndex, 2);
                                 }
                             }
 
-                            if (bestScore >= _minScorePixel && bestIndex >= 0)
+                            // Apply classification if score is high enough
+                            if (bestScore >= MinScorePixel && bestIndex >= 0)
                             {
                                 lbl.RawScore = bestScore;
                                 lbl.MaterialConfidence = Math.Min(1.0, bestScore);
 
-                                if (bestType == 0)
+                                if (bestType == 0 && bestIndex < _metals.Length)
                                 {
                                     acc.MetalCounts[bestIndex]++;
                                     lbl.MaterialType = PixelMaterialType.Metal;
                                     lbl.MaterialId = _metals[bestIndex].Id;
                                 }
-                                else if (bestType == 1)
+                                else if (bestType == 1 && bestIndex < _crystals.Length)
                                 {
                                     acc.CrystalCounts[bestIndex]++;
                                     lbl.MaterialType = PixelMaterialType.Crystal;
                                     lbl.MaterialId = _crystals[bestIndex].Id;
                                 }
-                                else if (bestType == 2)
+                                else if (bestType == 2 && bestIndex < _gems.Length)
                                 {
                                     acc.GemCounts[bestIndex]++;
                                     lbl.MaterialType = PixelMaterialType.Gem;
@@ -259,11 +308,12 @@ namespace HvsMvp.App
                 src24.UnlockBits(data);
             }
 
+            // Calculate focus score
             double focus = 0;
             if (sampleCount > 0)
             {
                 focus = gradSum / sampleCount / (255.0 * 255.0);
-                focus = Math.Min(1.0, focus);
+                focus = Math.Min(1.0, focus * 10); // Scale up for better visibility
             }
 
             var diag = new ImageDiagnosticsResult
@@ -283,6 +333,7 @@ namespace HvsMvp.App
 
             long denom = Math.Max(1, sampleCount);
 
+            // Build metal results
             for (int i = 0; i < _metals.Length; i++)
             {
                 double pct = (double)metalCounts[i] / denom;
@@ -292,11 +343,12 @@ namespace HvsMvp.App
                     Name = _metals[i].Name,
                     Group = _metals[i].Group,
                     PctSample = pct,
-                    PpmEstimated = pct > 0 ? pct * 1_000_000.0 : (double?)null,
-                    Score = Math.Max(0, Math.Min(1.0, pct * 10))
+                    PpmEstimated = pct > 0 ? pct * 1_000_000.0 : null,
+                    Score = CalculateMetalScore(pct, _metals[i].Group)
                 });
             }
 
+            // Build crystal results
             for (int i = 0; i < _crystals.Length; i++)
             {
                 double pct = (double)crystalCounts[i] / denom;
@@ -309,6 +361,7 @@ namespace HvsMvp.App
                 });
             }
 
+            // Build gem results
             for (int i = 0; i < _gems.Length; i++)
             {
                 double pct = (double)gemCounts[i] / denom;
@@ -332,6 +385,26 @@ namespace HvsMvp.App
                 Width = w,
                 Height = h
             };
+        }
+
+        /// <summary>
+        /// Calculate metal score with group-specific weighting.
+        /// Noble metals and PGM get higher scores for small percentages.
+        /// </summary>
+        private double CalculateMetalScore(double pct, string group)
+        {
+            double multiplier = 10.0;
+            
+            if (!string.IsNullOrEmpty(group))
+            {
+                string g = group.ToLowerInvariant();
+                if (g.Contains("nobre") || g.Contains("noble"))
+                    multiplier = 15.0;
+                else if (g.Contains("pgm"))
+                    multiplier = 12.0;
+            }
+            
+            return Math.Max(0, Math.Min(1.0, pct * multiplier));
         }
 
         private class LocalAcc
@@ -384,6 +457,31 @@ namespace HvsMvp.App
         {
             for (int i = 0; i < arr.Length; i++)
             {
+                var e = arr[i];
+                if (!InHueRange(H, e.H, e.HWrap)) continue;
+                if (S < e.S.Min || S > e.S.Max) continue;
+                if (V < e.V.Min || V > e.V.Max) continue;
+
+                double sh = HueScore(H, e.H, e.HWrap, e.HMid);
+                double ss = RangeScore(S, e.S, e.SHalf);
+                double sv = RangeScore(V, e.V, e.VHalf);
+                double score = (sh + ss + sv) / 3.0;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestType = typeVal;
+                    bestIndex = i;
+                }
+            }
+        }
+        
+        private void EvaluateListExcluding(double H, double S, double V, MatEntry[] arr, ref double bestScore, ref int bestType, ref int bestIndex, int typeVal, int excludeIndex)
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                if (i == excludeIndex) continue;
+                
                 var e = arr[i];
                 if (!InHueRange(H, e.H, e.HWrap)) continue;
                 if (S < e.S.Min || S > e.S.Max) continue;
@@ -460,6 +558,7 @@ namespace HvsMvp.App
                 var s = ReadRange(root, "s", 0, 1);
                 var v = ReadRange(root, "v", 0, 1);
 
+                // Normalize saturation and value if they appear to be percentages
                 if (s.Max > 1.0 || s.Min > 1.0) { s = (s.Min / 100.0, s.Max / 100.0); }
                 if (v.Max > 1.0 || v.Min > 1.0) { v = (v.Min / 100.0, v.Max / 100.0); }
 
@@ -482,54 +581,136 @@ namespace HvsMvp.App
         private string BuildShortReport(SampleFullAnalysisResult r)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("Resumo rápido da análise");
-            sb.AppendLine("------------------------");
+            sb.AppendLine("═══════════════════════════════════════════");
+            sb.AppendLine("       RESUMO DA ANÁLISE HVS-MVP");
+            sb.AppendLine("═══════════════════════════════════════════");
+            sb.AppendLine();
             sb.AppendLine($"Data/Hora (UTC): {r.CaptureDateTimeUtc:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"Foco (0..1): {r.Diagnostics.FocusScore:F2}");
-            sb.AppendLine($"Clipping saturação: {r.Diagnostics.SaturationClippingFraction:P1}");
-            sb.AppendLine($"Fraçao amostra: {r.Diagnostics.ForegroundFraction:P1}");
+            sb.AppendLine($"ID da Análise:   {r.Id}");
             sb.AppendLine();
-            sb.AppendLine("Metais (top 5):");
-            foreach (var m in r.Metals.OrderByDescending(m => m.PctSample).Take(5))
+            sb.AppendLine("─── DIAGNÓSTICOS ───");
+            sb.AppendLine($"  Foco (0..1):       {r.Diagnostics.FocusScore:F3}");
+            sb.AppendLine($"  Clipping:          {r.Diagnostics.SaturationClippingFraction:P2}");
+            sb.AppendLine($"  Fração amostra:    {r.Diagnostics.ForegroundFraction:P2}");
+            sb.AppendLine();
+            
+            var topMetals = r.Metals.Where(m => m.PctSample > 0).OrderByDescending(m => m.PctSample).Take(5).ToList();
+            sb.AppendLine("─── METAIS (top 5) ───");
+            if (topMetals.Count == 0)
             {
-                var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
-                sb.AppendLine($" - {m.Name} ({m.Id}): {m.PctSample:P3} · {ppm} · score={m.Score:F2}");
+                sb.AppendLine("  (nenhum metal detectado)");
+            }
+            else
+            {
+                foreach (var m in topMetals)
+                {
+                    var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F0} ppm" : "-";
+                    string groupTag = !string.IsNullOrEmpty(m.Group) ? $"[{m.Group}]" : "";
+                    sb.AppendLine($"  • {m.Name} ({m.Id}) {groupTag}");
+                    sb.AppendLine($"      {m.PctSample:P4} · {ppm} · score={m.Score:F2}");
+                }
             }
             sb.AppendLine();
-            sb.AppendLine("Cristais (top 3):");
-            foreach (var c in r.Crystals.OrderByDescending(c => c.PctSample).Take(3))
+            
+            var topCrystals = r.Crystals.Where(c => c.PctSample > 0).OrderByDescending(c => c.PctSample).Take(3).ToList();
+            sb.AppendLine("─── CRISTAIS (top 3) ───");
+            if (topCrystals.Count == 0)
             {
-                sb.AppendLine($" - {c.Name}: {c.PctSample:P3} · score={c.Score:F2}");
+                sb.AppendLine("  (nenhum cristal detectado)");
+            }
+            else
+            {
+                foreach (var c in topCrystals)
+                {
+                    sb.AppendLine($"  • {c.Name} ({c.Id}): {c.PctSample:P4} · score={c.Score:F2}");
+                }
             }
             sb.AppendLine();
-            sb.AppendLine("Gemas (top 3):");
-            foreach (var g in r.Gems.OrderByDescending(g => g.PctSample).Take(3))
+            
+            var topGems = r.Gems.Where(g => g.PctSample > 0).OrderByDescending(g => g.PctSample).Take(3).ToList();
+            sb.AppendLine("─── GEMAS (top 3) ───");
+            if (topGems.Count == 0)
             {
-                sb.AppendLine($" - {g.Name}: {g.PctSample:P3} · score={g.Score:F2}");
+                sb.AppendLine("  (nenhuma gema detectada)");
             }
+            else
+            {
+                foreach (var g in topGems)
+                {
+                    sb.AppendLine($"  • {g.Name} ({g.Id}): {g.PctSample:P4} · score={g.Score:F2}");
+                }
+            }
+            sb.AppendLine();
+            sb.AppendLine("═══════════════════════════════════════════");
+            
             return sb.ToString();
         }
 
-        private bool DetectGoldPixel(byte R, byte G, byte B, double H, double S, double V)
+        // ===== GOLD AND PGM HEURISTICS =====
+
+        /// <summary>
+        /// Determine if a pixel looks like gold based on RGB and HSV values.
+        /// Gold typically has:
+        /// - Hue in yellow range (40-70 degrees)
+        /// - Moderate to high saturation
+        /// - High brightness
+        /// - R and G channels significantly higher than B
+        /// - Warm, yellow-golden appearance
+        /// </summary>
+        private static bool LooksLikeGold(byte R, byte G, byte B, double H, double S, double V)
         {
-            if (H < 38 || H > 72) return false;
-            if (S < 0.12 || V < 0.26) return false;
+            // Hue must be in yellow/gold range (expanded range for variations)
+            if (H < 35 || H > 75) return false;
+            
+            // Saturation must indicate color presence (not grayscale)
+            if (S < 0.15) return false;
+            
+            // Brightness must be reasonable
+            if (V < 0.25 || V > 0.98) return false;
+            
+            // Gold has warm tones: R+G should dominate over B
             double avgRG = (R + G) / 2.0;
-            if (avgRG <= B + 6) return false;
+            if (avgRG <= B + 10) return false; // Must have warmer tones
+            
+            // R and G should be relatively close (not too red or too green)
             double diffRG = Math.Abs(R - G);
-            if (diffRG > 50) return false;
-            if (R < 110 && G < 110) return false;
+            if (diffRG > 60) return false; // Too unbalanced
+            
+            // Minimum brightness in absolute terms
+            if (R < 100 && G < 80) return false;
+            
+            // Additional check: gold tends to have high R and G relative to B
+            if (R < B * 1.2 || G < B * 1.1) return false;
+            
             return true;
         }
 
-        private bool DetectPgmPixel(byte R, byte G, byte B, double H, double S, double V)
+        /// <summary>
+        /// Determine if a pixel looks like platinum group metal (PGM).
+        /// PGM metals typically have:
+        /// - Very low saturation (grayish metallic)
+        /// - Moderate to high brightness
+        /// - R, G, B channels close to each other (neutral gray)
+        /// </summary>
+        private static bool LooksLikePgm(byte R, byte G, byte B, double H, double S, double V)
         {
-            if (S > 0.23) return false;
-            if (V < 0.18 || V > 0.92) return false;
+            // PGM has very low saturation (grayish)
+            if (S > 0.20) return false;
+            
+            // Brightness should be moderate to high (metallic sheen)
+            if (V < 0.20 || V > 0.95) return false;
+            
+            // R, G, B should be close (neutral gray)
             int max = Math.Max(R, Math.Max(G, B));
             int min = Math.Min(R, Math.Min(G, B));
-            if (max - min > 45) return false;
-            if (max > 245 && min > 220) return false;
+            if (max - min > 40) return false; // Too much color variation
+            
+            // Avoid pure white
+            if (max > 250 && min > 240) return false;
+            
+            // Avoid very dark pixels (likely shadows)
+            if (max < 60) return false;
+            
             return true;
         }
     }
