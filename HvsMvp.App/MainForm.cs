@@ -15,7 +15,7 @@ namespace HvsMvp.App
         private HvsConfig? _config;
         private HvsAnalysisService? _analysisService;
 
-        // Agora guardamos a análise completa numa única estrutura
+        // Cena completa da última análise
         private FullSceneAnalysis? _lastScene;
 
         private Panel _topContainer = null!;
@@ -203,37 +203,87 @@ namespace HvsMvp.App
 
         private void InitializeLayout()
         {
-            _topContainer = new Panel { Dock = DockStyle.Top, Height = 140, BackColor = Color.FromArgb(8, 16, 28) };
+            _topContainer = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 140,
+                BackColor = Color.FromArgb(8, 16, 28)
+            };
             Controls.Add(_topContainer);
 
-            var topLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+            var topLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3
+            };
             topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
             topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
             topLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
             _topContainer.Controls.Add(topLayout);
 
-            var toolbarPanel1 = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(12, 24, 40), Padding = new Padding(6, 4, 6, 2) };
+            var toolbarPanel1 = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(12, 24, 40),
+                Padding = new Padding(6, 4, 6, 2)
+            };
             topLayout.Controls.Add(toolbarPanel1, 0, 0);
 
-            _toolbarRow1 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoScroll = true };
+            _toolbarRow1 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = true
+            };
             toolbarPanel1.Controls.Add(_toolbarRow1);
 
-            var toolbarPanel2 = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(12, 24, 40), Padding = new Padding(6, 0, 6, 2) };
+            var toolbarPanel2 = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(12, 24, 40),
+                Padding = new Padding(6, 0, 6, 2)
+            };
             topLayout.Controls.Add(toolbarPanel2, 0, 1);
 
-            _toolbarRow2 = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoScroll = true };
+            _toolbarRow2 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = true
+            };
             toolbarPanel2.Controls.Add(_toolbarRow2);
 
-            _headerBar = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(200, 160, 60), Padding = new Padding(16, 4, 16, 4) };
+            _headerBar = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(200, 160, 60),
+                Padding = new Padding(16, 4, 16, 4)
+            };
             topLayout.Controls.Add(_headerBar, 0, 2);
 
-            var headerLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+            var headerLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1
+            };
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             headerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             _headerBar.Controls.Add(headerLayout);
 
-            _lblTitle = new Label { AutoSize = true, ForeColor = Color.FromArgb(20, 20, 30), Font = new Font("Segoe UI", 11, FontStyle.Bold), Margin = new Padding(4, 0, 4, 0), Anchor = AnchorStyles.Left, TextAlign = ContentAlignment.MiddleLeft };
+            _lblTitle = new Label
+            {
+                AutoSize = true,
+                ForeColor = Color.FromArgb(20, 20, 30),
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                Margin = new Padding(4, 0, 4, 0),
+                Anchor = AnchorStyles.Left,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
             headerLayout.Controls.Add(_lblTitle, 0, 0);
 
             _languageMenu = new ContextMenuStrip();
@@ -244,7 +294,16 @@ namespace HvsMvp.App
             _languageMenu.Items.Add("العربية", null, (s, e) => SetLanguage("ar"));
             _languageMenu.Items.Add("中文", null, (s, e) => SetLanguage("zh-CN"));
 
-            _btnLanguage = new Button { Text = "Idioma ▾", Size = new Size(110, 26), BackColor = Color.FromArgb(40, 40, 60), ForeColor = Color.WhiteSmoke, FlatStyle = FlatStyle.Flat, Anchor = AnchorStyles.Right, Margin = new Padding(12, 0, 0, 0) };
+            _btnLanguage = new Button
+            {
+                Text = "Idioma ▾",
+                Size = new Size(110, 26),
+                BackColor = Color.FromArgb(40, 40, 60),
+                ForeColor = Color.WhiteSmoke,
+                FlatStyle = FlatStyle.Flat,
+                Anchor = AnchorStyles.Right,
+                Margin = new Padding(12, 0, 0, 0)
+            };
             _btnLanguage.FlatAppearance.BorderColor = Color.FromArgb(30, 30, 50);
             _btnLanguage.FlatAppearance.BorderSize = 1;
             _btnLanguage.Click += BtnLanguage_Click;
@@ -252,7 +311,17 @@ namespace HvsMvp.App
 
             Button Cmd(string text)
             {
-                var b = new Button { Text = text, AutoSize = true, Height = 24, Margin = new Padding(4, 1, 4, 1), Padding = new Padding(8, 1, 8, 1), BackColor = Color.FromArgb(20, 40, 65), ForeColor = Color.WhiteSmoke, FlatStyle = FlatStyle.Flat };
+                var b = new Button
+                {
+                    Text = text,
+                    AutoSize = true,
+                    Height = 24,
+                    Margin = new Padding(4, 1, 4, 1),
+                    Padding = new Padding(8, 1, 8, 1),
+                    BackColor = Color.FromArgb(20, 40, 65),
+                    ForeColor = Color.WhiteSmoke,
+                    FlatStyle = FlatStyle.Flat
+                };
                 b.FlatAppearance.BorderColor = Color.FromArgb(60, 80, 110);
                 b.FlatAppearance.BorderSize = 1;
                 b.FlatAppearance.MouseOverBackColor = Color.FromArgb(30, 60, 95);
@@ -284,10 +353,22 @@ namespace HvsMvp.App
             _btnStopContinuous.Click += BtnStopContinuous_Click;
             _toolbarRow1.Controls.Add(_btnStopContinuous);
 
-            var lblAlvo = new Label { AutoSize = true, ForeColor = Color.Gainsboro, Margin = new Padding(10, 6, 2, 0) };
+            var lblAlvo = new Label
+            {
+                AutoSize = true,
+                ForeColor = Color.Gainsboro,
+                Margin = new Padding(10, 6, 2, 0)
+            };
             _toolbarRow1.Controls.Add(lblAlvo);
 
-            _cbTarget = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160, Margin = new Padding(2, 3, 4, 0), BackColor = Color.FromArgb(32, 32, 44), ForeColor = Color.White };
+            _cbTarget = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 160,
+                Margin = new Padding(2, 3, 4, 0),
+                BackColor = Color.FromArgb(32, 32, 44),
+                ForeColor = Color.White
+            };
             _toolbarRow1.Controls.Add(_cbTarget);
 
             _btnSelectiveAnalyze = Cmd("🎯 Análise seletiva");
@@ -350,7 +431,15 @@ namespace HvsMvp.App
             _btnCalib.Click += BtnCalibrarAuto_Click;
             _toolbarRow2.Controls.Add(_btnCalib);
 
-            _mainVerticalSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6, BackColor = Color.FromArgb(30, 30, 50), FixedPanel = FixedPanel.None, IsSplitterFixed = false };
+            _mainVerticalSplit = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Horizontal,
+                SplitterWidth = 6,
+                BackColor = Color.FromArgb(30, 30, 50),
+                FixedPanel = FixedPanel.None,
+                IsSplitterFixed = false
+            };
             Controls.Add(_mainVerticalSplit);
 
             _mainVerticalSplit.Panel1MinSize = 100;
@@ -360,44 +449,99 @@ namespace HvsMvp.App
             _mainVerticalSplit.Panel1.Controls.Add(_topContainer);
             _topContainer.Dock = DockStyle.Fill;
 
-            this.Load += (s, e) => { _mainVerticalSplit.SplitterDistance = (int)(ClientSize.Height * 0.20); };
+            this.Load += (s, e) =>
+            {
+                _mainVerticalSplit.SplitterDistance = (int)(ClientSize.Height * 0.20);
+            };
 
-            _contentVerticalSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6, BackColor = Color.FromArgb(25, 30, 45), FixedPanel = FixedPanel.None, IsSplitterFixed = false };
+            _contentVerticalSplit = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Horizontal,
+                SplitterWidth = 6,
+                BackColor = Color.FromArgb(25, 30, 45),
+                FixedPanel = FixedPanel.None,
+                IsSplitterFixed = false
+            };
             _mainVerticalSplit.Panel2.Controls.Add(_contentVerticalSplit);
 
             _contentVerticalSplit.Panel1MinSize = 200;
             _contentVerticalSplit.Panel2MinSize = 100;
             _contentVerticalSplit.SplitterDistance = (int)(ClientSize.Height * 0.6);
 
-            _cameraMaterialsSplit = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Vertical, SplitterWidth = 6, BackColor = Color.FromArgb(25, 30, 45), FixedPanel = FixedPanel.None, IsSplitterFixed = false };
+            _cameraMaterialsSplit = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterWidth = 6,
+                BackColor = Color.FromArgb(25, 30, 45),
+                FixedPanel = FixedPanel.None,
+                IsSplitterFixed = false
+            };
             _contentVerticalSplit.Panel1.Controls.Add(_cameraMaterialsSplit);
 
             _cameraMaterialsSplit.Panel1MinSize = 300;
             _cameraMaterialsSplit.Panel2MinSize = 250;
             _cameraMaterialsSplit.SplitterDistance = (int)(ClientSize.Width * 0.63);
 
-            _imagePanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.Black, Padding = new Padding(8), AutoScroll = true };
+            _imagePanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Black,
+                Padding = new Padding(8),
+                AutoScroll = true
+            };
             _cameraMaterialsSplit.Panel1.Controls.Add(_imagePanel);
 
-            _pictureSample = new PictureBox { BackColor = Color.Black, SizeMode = PictureBoxSizeMode.Normal, Location = new Point(0, 0) };
+            _pictureSample = new PictureBox
+            {
+                BackColor = Color.Black,
+                SizeMode = PictureBoxSizeMode.Normal
+            };
             _imagePanel.Controls.Add(_pictureSample);
             _pictureSample.MouseMove += PictureSample_MouseMove;
 
-            _rightPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(8, 18, 30), Padding = new Padding(8) };
+            _rightPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(8, 18, 30),
+                Padding = new Padding(8)
+            };
             _cameraMaterialsSplit.Panel2.Controls.Add(_rightPanel);
 
-            _materialsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+            _materialsLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2
+            };
             _materialsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             _materialsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             _rightPanel.Controls.Add(_materialsLayout);
 
-            var matHeader = new Panel { Dock = DockStyle.Top, Height = 22 };
+            var matHeader = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 22
+            };
             _materialsLayout.Controls.Add(matHeader, 0, 0);
 
-            var lblMatTitle = new Label { Text = "Metais / Cristais / Gemas", AutoSize = true, ForeColor = Color.FromArgb(210, 220, 235), Font = new Font("Segoe UI", 8, FontStyle.Bold), Location = new Point(2, 3) };
+            var lblMatTitle = new Label
+            {
+                Text = "Metais / Cristais / Gemas",
+                AutoSize = true,
+                ForeColor = Color.FromArgb(210, 220, 235),
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                Location = new Point(2, 3)
+            };
             matHeader.Controls.Add(lblMatTitle);
 
-            var columns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            var columns = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 3,
+                RowCount = 1
+            };
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
             columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f));
@@ -406,8 +550,23 @@ namespace HvsMvp.App
             (Panel colPanel, Label header, ListBox list) CreateColumn(string headerText)
             {
                 var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 2, 4, 2) };
-                var hdr = new Label { Dock = DockStyle.Top, Height = 18, TextAlign = ContentAlignment.MiddleLeft, ForeColor = Color.FromArgb(220, 230, 245), Font = new Font("Segoe UI", 8, FontStyle.Bold), Text = headerText };
-                var lb = new ListBox { Dock = DockStyle.Fill, BackColor = Color.FromArgb(12, 24, 36), ForeColor = Color.WhiteSmoke, BorderStyle = BorderStyle.FixedSingle, Font = new Font("Segoe UI", 8) };
+                var hdr = new Label
+                {
+                    Dock = DockStyle.Top,
+                    Height = 18,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.FromArgb(220, 230, 245),
+                    Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                    Text = headerText
+                };
+                var lb = new ListBox
+                {
+                    Dock = DockStyle.Fill,
+                    BackColor = Color.FromArgb(12, 24, 36),
+                    ForeColor = Color.WhiteSmoke,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Segoe UI", 8)
+                };
                 panel.Controls.Add(lb);
                 panel.Controls.Add(hdr);
                 return (panel, hdr, lb);
@@ -428,17 +587,44 @@ namespace HvsMvp.App
             _listGems = listGe;
             columns.Controls.Add(colGe, 2, 0);
 
-            _listMetals.SelectedIndexChanged += (s, e) => ShowMaterialDetails(_listMetals.SelectedItem as HvsMaterial);
-            _listCrystals.SelectedIndexChanged += (s, e) => ShowMaterialDetails(_listCrystals.SelectedItem as HvsMaterial);
-            _listGems.SelectedIndexChanged += (s, e) => ShowMaterialDetails(_listGems.SelectedItem as HvsMaterial);
+            _listMetals.SelectedIndexChanged += (s, e) =>
+                ShowMaterialDetails(_config?.Materials?.Metais?.ElementAtOrDefault(_listMetals.SelectedIndex));
 
-            _txtDetails = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, BackColor = Color.FromArgb(6, 14, 24), ForeColor = Color.Gainsboro, BorderStyle = BorderStyle.None, ScrollBars = ScrollBars.Vertical, Font = new Font("Consolas", 9) };
+            _listCrystals.SelectedIndexChanged += (s, e) =>
+                ShowMaterialDetails(_config?.Materials?.Cristais?.ElementAtOrDefault(_listCrystals.SelectedIndex));
+
+            _listGems.SelectedIndexChanged += (s, e) =>
+                ShowMaterialDetails(_config?.Materials?.Gemas?.ElementAtOrDefault(_listGems.SelectedIndex));
+
+            _txtDetails = new TextBox
+            {
+                Dock = DockStyle.Fill,
+                Multiline = true,
+                ReadOnly = true,
+                BackColor = Color.FromArgb(6, 14, 24),
+                ForeColor = Color.Gainsboro,
+                BorderStyle = BorderStyle.None,
+                ScrollBars = ScrollBars.Vertical,
+                Font = new Font("Consolas", 9)
+            };
             _contentVerticalSplit.Panel2.Controls.Add(_txtDetails);
 
-            _footerPanel = new Panel { Dock = DockStyle.Bottom, Height = 22, BackColor = Color.FromArgb(8, 18, 30), Padding = new Padding(8, 2, 8, 2) };
+            _footerPanel = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 22,
+                BackColor = Color.FromArgb(8, 18, 30),
+                Padding = new Padding(8, 2, 8, 2)
+            };
             Controls.Add(_footerPanel);
 
-            _lblStatus = new Label { ForeColor = Color.FromArgb(170, 185, 210), Dock = DockStyle.Left, AutoSize = false, TextAlign = ContentAlignment.MiddleLeft };
+            _lblStatus = new Label
+            {
+                ForeColor = Color.FromArgb(170, 185, 210),
+                Dock = DockStyle.Left,
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
             _footerPanel.Controls.Add(_lblStatus);
 
             ApplyLocaleTexts();
@@ -539,7 +725,12 @@ namespace HvsMvp.App
 
         private void BtnOpenImage_Click(object? sender, EventArgs e)
         {
-            using var dlg = new OpenFileDialog { Title = "Selecionar imagem de amostra", Filter = "Imagens|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|Todos os arquivos|*.*", Multiselect = false };
+            using var dlg = new OpenFileDialog
+            {
+                Title = "Selecionar imagem de amostra",
+                Filter = "Imagens|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|Todos os arquivos|*.*",
+                Multiselect = false
+            };
 
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
@@ -617,9 +808,27 @@ namespace HvsMvp.App
 
         private void BtnSelecionarCamera_Click(object? sender, EventArgs e)
         {
-            using var form = new Form { Text = "Selecionar câmera", StartPosition = FormStartPosition.CenterParent, Size = new Size(400, 160), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false };
-            var lbl = new Label { Text = "Escolha o índice da câmera (0, 1, 2...)", AutoSize = true, Location = new Point(12, 15) };
-            var combo = new ComboBox { Location = new Point(15, 40), Width = 80, DropDownStyle = ComboBoxStyle.DropDownList };
+            using var form = new Form
+            {
+                Text = "Selecionar câmera",
+                StartPosition = FormStartPosition.CenterParent,
+                Size = new Size(400, 160),
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+            var lbl = new Label
+            {
+                Text = "Escolha o índice da câmera (0, 1, 2...)",
+                AutoSize = true,
+                Location = new Point(12, 15)
+            };
+            var combo = new ComboBox
+            {
+                Location = new Point(15, 40),
+                Width = 80,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
             for (int i = 0; i < 4; i++) combo.Items.Add(i);
             combo.SelectedItem = _cameraIndex;
             var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(220, 80), Width = 70 };
@@ -635,9 +844,27 @@ namespace HvsMvp.App
 
         private void BtnSelecionarResolucao_Click(object? sender, EventArgs e)
         {
-            using var form = new Form { Text = "Selecionar resolução", StartPosition = FormStartPosition.CenterParent, Size = new Size(420, 220), FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false };
-            var lbl = new Label { Text = "Escolha uma resolução padrão:", AutoSize = true, Location = new Point(12, 15) };
-            var combo = new ComboBox { Location = new Point(15, 40), Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
+            using var form = new Form
+            {
+                Text = "Selecionar resolução",
+                StartPosition = FormStartPosition.CenterParent,
+                Size = new Size(420, 220),
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+            var lbl = new Label
+            {
+                Text = "Escolha uma resolução padrão:",
+                AutoSize = true,
+                Location = new Point(12, 15)
+            };
+            var combo = new ComboBox
+            {
+                Location = new Point(15, 40),
+                Width = 150,
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
             string[] presets = new[] { "640x480", "800x600", "1280x720", "1920x1080" };
             foreach (var p in presets) combo.Items.Add(p);
             string atual = $"{_cameraWidth}x{_cameraHeight}";
@@ -692,6 +919,12 @@ namespace HvsMvp.App
             }
         }
 
+        /// <summary>
+        /// Análise seletiva coerente com Summary + LabelMap.
+        /// - Usa Summary para achar o ID exato do alvo.
+        /// - Se fração do alvo == 0, não pinta nada (e avisa).
+        /// - Só pinta pixels onde Label.MaterialId == alvo e confiança alta.
+        /// </summary>
         private void BtnSelectiveAnalyze_Click(object? sender, EventArgs e)
         {
             if (_lastScene == null)
@@ -705,22 +938,25 @@ namespace HvsMvp.App
                 return;
             }
 
-            string alvo = _cbTarget.SelectedItem.ToString() ?? "(desconhecido)";
-            AppendLog($"Análise seletiva solicitada para: {alvo}");
+            string alvoTexto = _cbTarget.SelectedItem.ToString() ?? "(desconhecido)";
+            AppendLog($"Análise seletiva solicitada para: {alvoTexto}");
 
             var summary = _lastScene.Summary;
             var sb = new StringBuilder();
-            sb.AppendLine($"Análise seletiva – {alvo}");
+            sb.AppendLine($"Análise seletiva – {alvoTexto}");
             sb.AppendLine("--------------------------------");
 
-            int tipoAlvo = -1; // 0 metal, 1 cristal, 2 gema
+            string? targetId = null;
+            int tipoAlvo = -1;
+            double pctSample = 0;
 
-            if (alvo.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
+            if (alvoTexto.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
             {
-                string name = alvo.Substring("Metal:".Length).Trim();
+                string name = alvoTexto.Substring("Metal:".Length).Trim();
                 var m = summary.Metals.Find(x =>
                     string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
+
                 if (m != null)
                 {
                     var ppm = m.PpmEstimated.HasValue ? $"{m.PpmEstimated.Value:F1} ppm" : "-";
@@ -730,16 +966,18 @@ namespace HvsMvp.App
                     sb.AppendLine($"Fração na amostra: {m.PctSample:P4}");
                     sb.AppendLine($"PPM estimado: {ppm}");
                     sb.AppendLine($"Score combinado: {m.Score:F3}");
+                    targetId = m.Id;
+                    pctSample = m.PctSample;
+                    tipoAlvo = 0;
                 }
                 else
                 {
                     sb.AppendLine("Nenhum resultado para esse metal na última análise.");
                 }
-                tipoAlvo = 0;
             }
-            else if (alvo.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
+            else if (alvoTexto.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
             {
-                string name = alvo.Substring("Cristal:".Length).Trim();
+                string name = alvoTexto.Substring("Cristal:".Length).Trim();
                 var c = summary.Crystals.Find(x =>
                     string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
@@ -749,16 +987,18 @@ namespace HvsMvp.App
                     sb.AppendLine($"Nome: {c.Name}");
                     sb.AppendLine($"Fração na amostra: {c.PctSample:P4}");
                     sb.AppendLine($"Score combinado: {c.Score:F3}");
+                    targetId = c.Id;
+                    pctSample = c.PctSample;
+                    tipoAlvo = 1;
                 }
                 else
                 {
                     sb.AppendLine("Nenhum resultado para esse cristal na última análise.");
                 }
-                tipoAlvo = 1;
             }
-            else if (alvo.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
+            else if (alvoTexto.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
             {
-                string name = alvo.Substring("Gema:".Length).Trim();
+                string name = alvoTexto.Substring("Gema:".Length).Trim();
                 var g = summary.Gems.Find(x =>
                     string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(x.Id, name, StringComparison.OrdinalIgnoreCase));
@@ -768,15 +1008,39 @@ namespace HvsMvp.App
                     sb.AppendLine($"Nome: {g.Name}");
                     sb.AppendLine($"Fração na amostra: {g.PctSample:P4}");
                     sb.AppendLine($"Score combinado: {g.Score:F3}");
+                    targetId = g.Id;
+                    pctSample = g.PctSample;
+                    tipoAlvo = 2;
                 }
                 else
                 {
                     sb.AppendLine("Nenhum resultado para essa gema na última análise.");
                 }
-                tipoAlvo = 2;
             }
 
             _txtDetails.Text = sb.ToString();
+
+            if (string.IsNullOrWhiteSpace(targetId))
+            {
+                AppendLog("Nenhum ID de alvo encontrado no resumo. Nada para pintar.");
+                return;
+            }
+
+            // Regra crítica: se a fração da amostra para esse alvo é zero, não pintar nada.
+            if (pctSample <= 0)
+            {
+                AppendLog($"Fração da amostra para '{alvoTexto}' é 0%. Nenhum pixel será destacado.");
+                if (_lastBaseImageClone != null)
+                {
+                    _pictureSample.Image?.Dispose();
+                    _pictureSample.Image = (Bitmap)_lastBaseImageClone.Clone();
+                    _showSelectiveMask = false;
+                    _showMask = _showMaskedBackground = false;
+                    _zoomFactor = 1.0f;
+                    ApplyZoom();
+                }
+                return;
+            }
 
             if (_lastBaseImageClone == null)
             {
@@ -784,9 +1048,8 @@ namespace HvsMvp.App
                 return;
             }
 
-            // Máscara seletiva usando PixelLabel (LabelMap)
             using var baseImg = new Bitmap(_lastBaseImageClone);
-            var selective = BuildSelectiveMaskFromLabels(baseImg, _lastScene, alvo, tipoAlvo);
+            var selective = BuildSelectiveMaskFromLabels(baseImg, _lastScene, targetId, tipoAlvo);
 
             if (selective != null)
             {
@@ -806,8 +1069,12 @@ namespace HvsMvp.App
 
         /// <summary>
         /// Usa FullSceneAnalysis.Labels para construir uma view seletiva do alvo.
+        /// Só pinta pixels:
+        /// - Dentro da amostra (Label.IsSample == true)
+        /// - Com MaterialId == targetId
+        /// - Com confiança >= 0.6
         /// </summary>
-        private Bitmap? BuildSelectiveMaskFromLabels(Bitmap baseImage, FullSceneAnalysis scene, string alvo, int tipoAlvo)
+        private Bitmap? BuildSelectiveMaskFromLabels(Bitmap baseImage, FullSceneAnalysis scene, string targetId, int tipoAlvo)
         {
             if (scene.Labels == null) return null;
             int w = scene.Width;
@@ -815,32 +1082,7 @@ namespace HvsMvp.App
             if (w <= 0 || h <= 0) return null;
             if (baseImage.Width != w || baseImage.Height != h) return null;
 
-            // Determina o Id textual do alvo (Id de material)
-            string? targetId = null;
-            if (alvo.StartsWith("Metal:", StringComparison.OrdinalIgnoreCase))
-            {
-                string name = alvo.Substring("Metal:".Length).Trim();
-                targetId = scene.Summary.Metals.FirstOrDefault(m =>
-                    string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(m.Id, name, StringComparison.OrdinalIgnoreCase))?.Id;
-            }
-            else if (alvo.StartsWith("Cristal:", StringComparison.OrdinalIgnoreCase))
-            {
-                string name = alvo.Substring("Cristal:".Length).Trim();
-                targetId = scene.Summary.Crystals.FirstOrDefault(c =>
-                    string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(c.Id, name, StringComparison.OrdinalIgnoreCase))?.Id;
-            }
-            else if (alvo.StartsWith("Gema:", StringComparison.OrdinalIgnoreCase))
-            {
-                string name = alvo.Substring("Gema:".Length).Trim();
-                targetId = scene.Summary.Gems.FirstOrDefault(g =>
-                    string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(g.Id, name, StringComparison.OrdinalIgnoreCase))?.Id;
-            }
-
-            if (string.IsNullOrWhiteSpace(targetId))
-                return null;
+            const double CONF_THRESHOLD = 0.6;
 
             Color overlayColor =
                 tipoAlvo == 0 ? Color.FromArgb(255, 255, 220, 0) :   // metal => amarelo
@@ -867,10 +1109,10 @@ namespace HvsMvp.App
                         continue;
                     }
 
-                    // É amostra: destaca apenas se materialId bater com alvo e confiança razoável
+                    // Só destaca se LabelMap bater com o alvo e confiança alta
                     if (!string.IsNullOrWhiteSpace(lbl.MaterialId) &&
                         string.Equals(lbl.MaterialId, targetId, StringComparison.OrdinalIgnoreCase) &&
-                        lbl.MaterialConfidence >= 0.4)
+                        lbl.MaterialConfidence >= CONF_THRESHOLD)
                     {
                         double a = 0.6;
                         int r = (int)(src.R * (1 - a) + overlayColor.R * a);
@@ -1352,7 +1594,7 @@ namespace HvsMvp.App
             {
                 foreach (var m in _config.Materials.Metais)
                 {
-                    _listMetals.Items.Add(m);
+                    _listMetals.Items.Add($"{m.Nome ?? m.Id} ({m.Id})");
                     nMet++;
 
                     var nome = string.IsNullOrWhiteSpace(m.Nome) ? m.Id : m.Nome;
@@ -1365,7 +1607,7 @@ namespace HvsMvp.App
             {
                 foreach (var c in _config.Materials.Cristais)
                 {
-                    _listCrystals.Items.Add(c);
+                    _listCrystals.Items.Add($"{c.Nome ?? c.Id} ({c.Id})");
                     nCr++;
 
                     var nome = string.IsNullOrWhiteSpace(c.Nome) ? c.Id : c.Nome;
@@ -1378,7 +1620,7 @@ namespace HvsMvp.App
             {
                 foreach (var g in _config.Materials.Gemas)
                 {
-                    _listGems.Items.Add(g);
+                    _listGems.Items.Add($"{g.Nome ?? g.Id} ({g.Id})");
                     nGe++;
 
                     var nome = string.IsNullOrWhiteSpace(g.Nome) ? g.Id : g.Nome;
@@ -1435,7 +1677,6 @@ namespace HvsMvp.App
                 frameProvider: () => SafeGetCurrentFrameClone(),
                 analyzer: bmp =>
                 {
-                    // Usamos AnalyzeScene, mas só retornamos o Summary
                     var scene = _analysisService.AnalyzeScene(bmp, null);
                     return (scene.Summary, scene.Mask, scene.MaskPreview);
                 },
@@ -1473,9 +1714,18 @@ namespace HvsMvp.App
         private void OnContinuousAnalysis(SampleFullAnalysisResult result)
         {
             if (result == null) return;
-            // No contínuo atualizamos apenas resumo na UI
+
+            // Atualiza somente o resumo no modo contínuo
             if (_lastScene == null)
-                _lastScene = new FullSceneAnalysis { Summary = result, Labels = new PixelLabel[1, 1], Mask = new SampleMaskClass?[1, 1], MaskPreview = new Bitmap(1, 1), Width = 1, Height = 1 };
+                _lastScene = new FullSceneAnalysis
+                {
+                    Summary = result,
+                    Labels = new PixelLabel[1, 1],
+                    Mask = new SampleMaskClass?[1, 1],
+                    MaskPreview = new Bitmap(1, 1),
+                    Width = 1,
+                    Height = 1
+                };
             else
                 _lastScene.Summary = result;
 
