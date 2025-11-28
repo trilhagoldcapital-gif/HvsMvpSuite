@@ -20,7 +20,16 @@ namespace HvsMvp.App
             RunFullAnalysis(Bitmap bmp, string? imagePath)
         {
             var scene = AnalyzeScene(bmp, imagePath);
-            var mask = scene.Mask ?? new SampleMaskClass[scene.Width, scene.Height];
+            // Convert nullable mask to non-nullable mask
+            var nullableMask = scene.Mask;
+            var mask = new SampleMaskClass[scene.Width, scene.Height];
+            for (int y = 0; y < scene.Height; y++)
+            {
+                for (int x = 0; x < scene.Width; x++)
+                {
+                    mask[x, y] = nullableMask[x, y] ?? new SampleMaskClass { IsSample = false };
+                }
+            }
             return (scene.Summary, mask, scene.MaskPreview);
         }
 

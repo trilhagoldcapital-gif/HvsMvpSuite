@@ -160,7 +160,9 @@ namespace HvsMvp.App
         private Bitmap? _lastBaseImageClone;   // imagem analisada
         private bool _showMask;
         private bool _showMaskedBackground;
+#pragma warning disable CS0414 // Field is assigned but its value is never used - placeholder for future selective visualization
         private bool _showSelectiveMask;
+#pragma warning restore CS0414
 
         public MainForm()
         {
