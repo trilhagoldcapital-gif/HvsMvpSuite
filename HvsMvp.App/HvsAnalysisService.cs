@@ -11,6 +11,10 @@ namespace HvsMvp.App
     {
         private readonly HvsConfig _config;
 
+        // Constants for particle segmentation
+        private const int MinParticleSizeAbsolute = 20;
+        private const int MinParticleSizeDivisor = 50000;
+
         public HvsAnalysisService(HvsConfig config)
         {
             _config = config;
@@ -175,6 +179,11 @@ namespace HvsMvp.App
                             byte G = buf[off + 1];
                             byte R = buf[off + 2];
 
+                            // Store RGB values
+                            lbl.R = R;
+                            lbl.G = G;
+                            lbl.B = B;
+
                             int gray = (int)(0.299 * R + 0.587 * G + 0.114 * B);
                             if (gray < 5 || gray > 250) acc.Clip++;
 
@@ -207,6 +216,8 @@ namespace HvsMvp.App
                             {
                                 lbl.MaterialType = PixelMaterialType.Metal;
                                 lbl.MaterialId = "Au";
+                                lbl.ScoreHvs = 0.95;
+                                lbl.ScoreIa = 0.95; // Stub: same as HVS
                                 lbl.RawScore = 0.95;
                                 lbl.MaterialConfidence = 0.95;
                                 acc.Au++;
@@ -215,6 +226,8 @@ namespace HvsMvp.App
                             {
                                 lbl.MaterialType = PixelMaterialType.Metal;
                                 lbl.MaterialId = "Pt";
+                                lbl.ScoreHvs = 0.80;
+                                lbl.ScoreIa = 0.80; // Stub: same as HVS
                                 lbl.RawScore = 0.80;
                                 lbl.MaterialConfidence = 0.80;
                                 acc.Pt++;
@@ -223,6 +236,8 @@ namespace HvsMvp.App
                             {
                                 lbl.MaterialType = PixelMaterialType.Metal;
                                 lbl.MaterialId = "MetalOther";
+                                lbl.ScoreHvs = 0.60;
+                                lbl.ScoreIa = 0.60; // Stub: same as HVS
                                 lbl.RawScore = 0.60;
                                 lbl.MaterialConfidence = 0.60;
                                 acc.Other++;
@@ -357,96 +372,10 @@ namespace HvsMvp.App
             }
 
             // -----------------------------
-            // BLOCO 3A + 3B – BANCO DE PARTÍCULAS BÁSICO
+            // BLOCO 3A + 3B – BANCO DE PARTÍCULAS com segmentação individual
             // -----------------------------
 
-            var particles = new List<ParticleRecord>();
-
-            if (sampleCount > 0)
-            {
-                long auPx = 0, ptPx = 0, otherPx = 0;
-                long auSumX = 0, auSumY = 0;
-                long ptSumX = 0, ptSumY = 0;
-                long otherSumX = 0, otherSumY = 0;
-
-                for (int y = 0; y < h; y++)
-                {
-                    for (int x = 0; x < w; x++)
-                    {
-                        var lbl = labels[x, y];
-                        if (lbl == null || !lbl.IsSample || lbl.MaterialType != PixelMaterialType.Metal)
-                            continue;
-
-                        if (string.Equals(lbl.MaterialId, "Au", StringComparison.OrdinalIgnoreCase))
-                        {
-                            auPx++;
-                            auSumX += x;
-                            auSumY += y;
-                        }
-                        else if (string.Equals(lbl.MaterialId, "Pt", StringComparison.OrdinalIgnoreCase))
-                        {
-                            ptPx++;
-                            ptSumX += x;
-                            ptSumY += y;
-                        }
-                        else if (string.Equals(lbl.MaterialId, "MetalOther", StringComparison.OrdinalIgnoreCase))
-                        {
-                            otherPx++;
-                            otherSumX += x;
-                            otherSumY += y;
-                        }
-                    }
-                }
-
-                if (auPx > 0)
-                {
-                    int cx = (int)(auSumX / auPx);
-                    int cy = (int)(auSumY / auPx);
-
-                    particles.Add(new ParticleRecord
-                    {
-                        AnalysisId = result.Id,
-                        MaterialId = "Au",
-                        Confidence = 0.95,
-                        ApproxAreaPixels = (int)auPx,
-                        CenterX = cx,
-                        CenterY = cy
-                    });
-                }
-
-                if (ptPx > 0)
-                {
-                    int cx = (int)(ptSumX / ptPx);
-                    int cy = (int)(ptSumY / ptPx);
-
-                    particles.Add(new ParticleRecord
-                    {
-                        AnalysisId = result.Id,
-                        MaterialId = "Pt",
-                        Confidence = 0.80,
-                        ApproxAreaPixels = (int)ptPx,
-                        CenterX = cx,
-                        CenterY = cy
-                    });
-                }
-
-                if (otherPx > 0)
-                {
-                    int cx = (int)(otherSumX / otherPx);
-                    int cy = (int)(otherSumY / otherPx);
-
-                    particles.Add(new ParticleRecord
-                    {
-                        AnalysisId = result.Id,
-                        MaterialId = "MetalOther",
-                        Confidence = 0.60,
-                        ApproxAreaPixels = (int)otherPx,
-                        CenterX = cx,
-                        CenterY = cy
-                    });
-                }
-            }
-
+            var particles = SegmentParticles(labels, mask, w, h, result.Id);
             result.Particles.AddRange(particles);
 
             result.ShortReport = BuildShortReport(result);
@@ -459,6 +388,216 @@ namespace HvsMvp.App
                 MaskPreview = (Bitmap)maskPreview.Clone(),
                 Width = w,
                 Height = h
+            };
+        }
+
+        /// <summary>
+        /// Segmenta pixels contíguos da mesma classe em partículas individuais.
+        /// </summary>
+        private List<ParticleRecord> SegmentParticles(
+            PixelLabel[,] labels,
+            SampleMaskClass[,] mask,
+            int w, int h,
+            Guid analysisId)
+        {
+            var particles = new List<ParticleRecord>();
+            var visited = new bool[w, h];
+            var aiService = new PixelClassificationAiServiceStub();
+
+            int[] dx = { -1, 0, 1, -1, 1, -1, 0, 1 };
+            int[] dy = { -1, -1, -1, 0, 0, 1, 1, 1 };
+
+            var queue = new Queue<(int x, int y)>();
+            int minParticleSize = Math.Max(MinParticleSizeAbsolute, (w * h) / MinParticleSizeDivisor);
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var lbl = labels[x, y];
+                    if (lbl == null || !lbl.IsSample || visited[x, y])
+                        continue;
+
+                    // Iniciar BFS para agrupar pixels contíguos
+                    var features = new ParticleFeatures();
+                    queue.Clear();
+
+                    visited[x, y] = true;
+                    queue.Enqueue((x, y));
+
+                    while (queue.Count > 0)
+                    {
+                        var (cx, cy) = queue.Dequeue();
+                        var pixLbl = labels[cx, cy];
+
+                        // Acumular features
+                        features.PixelCount++;
+                        features.SumX += cx;
+                        features.SumY += cy;
+                        features.MinX = Math.Min(features.MinX, cx);
+                        features.MaxX = Math.Max(features.MaxX, cx);
+                        features.MinY = Math.Min(features.MinY, cy);
+                        features.MaxY = Math.Max(features.MaxY, cy);
+                        features.SumH += pixLbl.H;
+                        features.SumS += pixLbl.S;
+                        features.SumV += pixLbl.V;
+                        features.SumConfidence += pixLbl.MaterialConfidence;
+                        features.SumConfidenceSq += pixLbl.MaterialConfidence * pixLbl.MaterialConfidence;
+                        features.Pixels.Add((cx, cy));
+
+                        // Contar votos por material
+                        string matId = pixLbl.MaterialId ?? "Unknown";
+                        if (!features.MaterialVotes.ContainsKey(matId))
+                        {
+                            features.MaterialVotes[matId] = 0;
+                            features.MaterialWeightedVotes[matId] = 0;
+                        }
+                        features.MaterialVotes[matId]++;
+                        features.MaterialWeightedVotes[matId] += pixLbl.MaterialConfidence;
+
+                        // Verificar se é pixel de borda
+                        bool isBorder = false;
+                        for (int k = 0; k < 8 && !isBorder; k++)
+                        {
+                            int nx = cx + dx[k];
+                            int ny = cy + dy[k];
+                            if (nx < 0 || ny < 0 || nx >= w || ny >= h)
+                            {
+                                isBorder = true;
+                            }
+                            else if (labels[nx, ny] == null || !labels[nx, ny].IsSample)
+                            {
+                                isBorder = true;
+                            }
+                        }
+                        if (isBorder) features.BorderPixelCount++;
+
+                        // Expandir para vizinhos da mesma classificação
+                        for (int k = 0; k < 8; k++)
+                        {
+                            int nx = cx + dx[k];
+                            int ny = cy + dy[k];
+                            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                            if (visited[nx, ny]) continue;
+
+                            var neighLbl = labels[nx, ny];
+                            if (neighLbl == null || !neighLbl.IsSample) continue;
+
+                            visited[nx, ny] = true;
+                            queue.Enqueue((nx, ny));
+                        }
+                    }
+
+                    // Ignorar partículas muito pequenas
+                    if (features.PixelCount < minParticleSize)
+                        continue;
+
+                    // Criar ParticleRecord
+                    var particle = CreateParticleRecord(features, analysisId, aiService);
+                    particles.Add(particle);
+                }
+            }
+
+            return particles;
+        }
+
+        /// <summary>
+        /// Cria um ParticleRecord a partir das features acumuladas.
+        /// </summary>
+        private ParticleRecord CreateParticleRecord(ParticleFeatures features, Guid analysisId, IPixelClassificationAiService aiService)
+        {
+            var (cx, cy) = features.GetCentroid();
+            int n = features.PixelCount;
+
+            // Determinar material dominante por voto ponderado
+            string dominantMaterial = "Unknown";
+            double maxVote = 0;
+            foreach (var (matId, vote) in features.MaterialWeightedVotes)
+            {
+                if (vote > maxVote)
+                {
+                    maxVote = vote;
+                    dominantMaterial = matId;
+                }
+            }
+
+            // Calcular confiança média
+            double avgConf = n > 0 ? features.SumConfidence / n : 0;
+            double variance = n > 1
+                ? (features.SumConfidenceSq - features.SumConfidence * features.SumConfidence / n) / (n - 1)
+                : 0;
+            double stdDev = Math.Sqrt(Math.Max(0, variance));
+
+            // Calcular HSV médio
+            double avgH = n > 0 ? features.SumH / n : 0;
+            double avgS = n > 0 ? features.SumS / n : 0;
+            double avgV = n > 0 ? features.SumV / n : 0;
+
+            // Calcular circularidade (aproximada)
+            int perimeter = features.BorderPixelCount;
+            double circularity = perimeter > 0
+                ? (4 * Math.PI * n) / (perimeter * perimeter)
+                : 0;
+            circularity = Math.Min(1.0, Math.Max(0, circularity));
+
+            // Calcular aspect ratio do bounding box
+            int bbW = features.MaxX - features.MinX + 1;
+            int bbH = features.MaxY - features.MinY + 1;
+            double aspectRatio = bbH > 0 ? (double)bbW / bbH : 1.0;
+            if (aspectRatio < 1) aspectRatio = 1.0 / aspectRatio; // Sempre >= 1
+
+            // Scores HVS e IA
+            double scoreHvs = avgConf;
+            double scoreIa = avgConf; // Stub: usa HVS
+
+            // Fusão de scores
+            var (fusedMat, fusedConf, fusedRaw) = ScoreFusionService.FuseHvsOnly(dominantMaterial, scoreHvs);
+
+            // Calcular composição
+            var composition = new Dictionary<string, double>();
+            foreach (var (matId, vote) in features.MaterialVotes)
+            {
+                composition[matId] = (double)vote / n;
+            }
+
+            return new ParticleRecord
+            {
+                AnalysisId = analysisId,
+                MaterialId = fusedMat,
+                Confidence = fusedConf,
+                ApproxAreaPixels = n,
+                CenterX = cx,
+                CenterY = cy,
+
+                // Forma
+                Circularity = circularity,
+                AspectRatio = aspectRatio,
+                MajorAxisLength = Math.Max(bbW, bbH),
+                MinorAxisLength = Math.Min(bbW, bbH),
+                Perimeter = perimeter,
+
+                // Bounding box
+                BoundingBoxX = features.MinX,
+                BoundingBoxY = features.MinY,
+                BoundingBoxWidth = bbW,
+                BoundingBoxHeight = bbH,
+
+                // HSV
+                AvgH = avgH,
+                AvgS = avgS,
+                AvgV = avgV,
+
+                // Scores
+                ScoreHvs = scoreHvs,
+                ScoreIa = scoreIa,
+                ScoreCombined = fusedRaw,
+
+                // Confiança
+                AveragePixelConfidence = avgConf,
+                ConfidenceStdDev = stdDev,
+
+                // Composição
+                Composition = composition
             };
         }
 
