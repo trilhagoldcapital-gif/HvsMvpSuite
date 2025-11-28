@@ -24,6 +24,82 @@ namespace HvsMvp.App
             return (scene.Summary, mask, scene.MaskPreview);
         }
 
+        /// <summary>
+        /// BLOCO 2 – Executa análise com reanálise automática para amostras críticas.
+        /// Regra inicial:
+        /// - Se QualityStatus == "Invalid", roda mais 2 análises na mesma imagem.
+        /// - Compara QualityIndex e %Au nas 3 rodadas.
+        /// - Se convergir: QualityStatus = "OfficialRechecked".
+        /// - Se divergir:  QualityStatus = "ReviewRequired".
+        /// </summary>
+        public SampleFullAnalysisResult RunWithAutoReanalysis(Bitmap bmp, string? imagePath)
+        {
+            // 1) Primeira análise normal
+            var scene1 = AnalyzeScene(bmp, imagePath);
+            var r1 = scene1.Summary;
+
+            // Se não for "Invalid", não é amostra crítica: retorna direto
+            if (!string.Equals(r1.QualityStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
+                return r1;
+
+            // 2) Amostra crítica -> executar mais 2 análises completas na mesma imagem
+            var scene2 = AnalyzeScene(bmp, imagePath);
+            var scene3 = AnalyzeScene(bmp, imagePath);
+            var r2 = scene2.Summary;
+            var r3 = scene3.Summary;
+
+            // Extrair QualityIndex
+            double q1 = r1.QualityIndex;
+            double q2 = r2.QualityIndex;
+            double q3 = r3.QualityIndex;
+
+            double qMin = Math.Min(q1, Math.Min(q2, q3));
+            double qMax = Math.Max(q1, Math.Max(q2, q3));
+            double qRange = qMax - qMin;
+
+            // Extrair %Au das 3 rodadas
+            double GetPctAu(SampleFullAnalysisResult r)
+            {
+                var au = r.Metals.FirstOrDefault(m => string.Equals(m.Id, "Au", StringComparison.OrdinalIgnoreCase));
+                return au?.PctSample ?? 0.0;
+            }
+
+            double a1 = GetPctAu(r1);
+            double a2 = GetPctAu(r2);
+            double a3 = GetPctAu(r3);
+
+            double aMin = Math.Min(a1, Math.Min(a2, a3));
+            double aMax = Math.Max(a1, Math.Max(a2, a3));
+            double aRange = aMax - aMin;
+
+            // Critério simples de convergência:
+            // - QualityIndex dentro de faixa de 5 pontos
+            // - PctAu dentro de faixa de 0.0005 (0,05% da amostra)
+            bool convergiu = (qRange <= 5.0) && (aRange <= 0.0005);
+
+            if (convergiu)
+            {
+                r1.QualityStatus = "OfficialRechecked";
+            }
+            else
+            {
+                r1.QualityStatus = "ReviewRequired";
+            }
+
+            // Monta um pequeno resumo da reanálise para anexo ao ShortReport
+            var sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine("--- Reanálise automática (BLOCO 2) ---");
+            sb.AppendLine($"Rodadas: 3");
+            sb.AppendLine($"QualityIndex: {q1:F1}, {q2:F1}, {q3:F1} (range={qRange:F1})");
+            sb.AppendLine($"PctAu: {a1:P4}, {a2:P4}, {a3:P4} (range={aRange:P4})");
+            sb.AppendLine($"Decisão: {(convergiu ? "OfficialRechecked" : "ReviewRequired")}");
+
+            r1.ShortReport = (r1.ShortReport ?? string.Empty) + sb.ToString();
+
+            return r1;
+        }
+
         public FullSceneAnalysis AnalyzeScene(Bitmap bmp, string? imagePath)
         {
             using var src24 = Ensure24bpp(bmp);
@@ -238,7 +314,6 @@ namespace HvsMvp.App
                 SaturationClippingFraction = diagTotal > 0 ? (double)diagClip / diagTotal : 0,
                 ForegroundFraction = (double)sampleCount / Math.Max(1, w * h),
 
-                // NOVOS CAMPOS (se quiser expor no objeto de diagnóstico também)
                 FocusScorePercent = focusScore,
                 ExposureScore = exposureScore,
                 MaskScore = maskScore,
@@ -252,8 +327,6 @@ namespace HvsMvp.App
                 ImagePath = imagePath,
                 CaptureDateTimeUtc = DateTime.UtcNow,
                 Diagnostics = diag,
-
-                // Campo de qualidade direto no resultado resumido
                 QualityIndex = qualityIndex,
                 QualityStatus = qualityStatus
             };
