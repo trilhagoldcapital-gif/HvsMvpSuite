@@ -17,6 +17,14 @@ namespace HvsMvp.App
         public string ReportsDirectory { get; set; } = "";
         public string SessionsDirectory { get; set; } = "";
         public string LogsDirectory { get; set; } = "";
+        public string BiExportDirectory { get; set; } = "";
+        public string DatasetIaDirectory { get; set; } = "";
+
+        // ===== Laudo (Report) =====
+        public bool GeneratePdfByDefault { get; set; } = false;
+        public bool GenerateTxtByDefault { get; set; } = true;
+        public string DefaultSampleName { get; set; } = "";
+        public string DefaultClientProject { get; set; } = "";
 
         // ===== Câmera (Camera) =====
         public int DefaultCameraIndex { get; set; } = 0;
@@ -93,6 +101,12 @@ namespace HvsMvp.App
                 ReportsDirectory = Path.Combine(baseDir, "exports"),
                 SessionsDirectory = Path.Combine(baseDir, "sessions"),
                 LogsDirectory = Path.Combine(baseDir, "logs"),
+                BiExportDirectory = Path.Combine(baseDir, "exports", "bi"),
+                DatasetIaDirectory = Path.Combine(baseDir, "exports", "dataset-ia"),
+                GeneratePdfByDefault = false,
+                GenerateTxtByDefault = true,
+                DefaultSampleName = "",
+                DefaultClientProject = "",
                 DefaultCameraIndex = 0,
                 PreferredResolution = "1920x1080",
                 MaskSensitivity = 0.3,
@@ -121,6 +135,12 @@ namespace HvsMvp.App
             ReportsDirectory = defaults.ReportsDirectory;
             SessionsDirectory = defaults.SessionsDirectory;
             LogsDirectory = defaults.LogsDirectory;
+            BiExportDirectory = defaults.BiExportDirectory;
+            DatasetIaDirectory = defaults.DatasetIaDirectory;
+            GeneratePdfByDefault = defaults.GeneratePdfByDefault;
+            GenerateTxtByDefault = defaults.GenerateTxtByDefault;
+            DefaultSampleName = defaults.DefaultSampleName;
+            DefaultClientProject = defaults.DefaultClientProject;
             DefaultCameraIndex = defaults.DefaultCameraIndex;
             PreferredResolution = defaults.PreferredResolution;
             MaskSensitivity = defaults.MaskSensitivity;
