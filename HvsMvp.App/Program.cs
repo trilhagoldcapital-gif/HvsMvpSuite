@@ -9,7 +9,7 @@ namespace HvsMvp.App
 {
     internal static class Program
     {
-        // PR10: Reduced splash display time for better UX (2 seconds)
+        // PR10: Splash display time
         private const int SplashDisplayTimeMs = 2000;
 
         [STAThread]
@@ -35,24 +35,20 @@ namespace HvsMvp.App
                 // If splash fails, continue without it
             }
 
-            // Wait for minimum splash time, then close it
-            Task.Run(async () =>
-            {
-                await Task.Delay(SplashDisplayTimeMs);
-                splash?.BeginInvoke(new Action(() =>
-                {
-                    try { splash?.CloseSplash(); } catch { }
-                }));
-            });
-
-            // PR10: Show welcome screen unless skipped
+            // PR10: Determine welcome action
             WelcomeScreen.WelcomeAction welcomeAction = WelcomeScreen.WelcomeAction.GoToMainDirect;
             string? selectedImagePath = null;
 
             if (!appSettings.SkipWelcomeScreen)
             {
-                // Wait for splash to close before showing welcome
-                Task.Delay(SplashDisplayTimeMs + 500).Wait();
+                // Close splash before showing welcome (use synchronous approach)
+                // This is on the main thread before the message loop starts, so it's safe
+                Thread.Sleep(Math.Max(0, SplashDisplayTimeMs - (int)(DateTime.UtcNow - splashStartTime).TotalMilliseconds + 200));
+                
+                try { splash?.CloseSplash(); } catch { }
+                
+                // Small delay to let splash close animation complete
+                Thread.Sleep(400);
 
                 using var welcomeScreen = new WelcomeScreen(appSettings);
                 var result = welcomeScreen.ShowDialog();
@@ -75,8 +71,20 @@ namespace HvsMvp.App
                     return;
                 }
             }
+            else
+            {
+                // Skipping welcome - just let splash complete and close
+                Task.Run(async () =>
+                {
+                    await Task.Delay(SplashDisplayTimeMs);
+                    splash?.BeginInvoke(new Action(() =>
+                    {
+                        try { splash?.CloseSplash(); } catch { }
+                    }));
+                });
+            }
 
-            // Handle explore action - open folder and exit or continue to main
+            // Handle explore action - open folder
             if (welcomeAction == WelcomeScreen.WelcomeAction.ExploreSamplesReports)
             {
                 try
