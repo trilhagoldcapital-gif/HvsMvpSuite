@@ -47,7 +47,6 @@ namespace HvsMvp.App
             var r2 = scene2.Summary;
             var r3 = scene3.Summary;
 
-            // Extrair QualityIndex
             double q1 = r1.QualityIndex;
             double q2 = r2.QualityIndex;
             double q3 = r3.QualityIndex;
@@ -56,7 +55,6 @@ namespace HvsMvp.App
             double qMax = Math.Max(q1, Math.Max(q2, q3));
             double qRange = qMax - qMin;
 
-            // Extrair %Au das 3 rodadas
             double GetPctAu(SampleFullAnalysisResult r)
             {
                 var au = r.Metals.FirstOrDefault(m => string.Equals(m.Id, "Au", StringComparison.OrdinalIgnoreCase));
@@ -71,24 +69,17 @@ namespace HvsMvp.App
             double aMax = Math.Max(a1, Math.Max(a2, a3));
             double aRange = aMax - aMin;
 
-            // Critério simples de convergência:
-            // - QualityIndex dentro de faixa de 5 pontos
-            // - PctAu dentro de faixa de 0.0005 (0,05% da amostra)
             bool convergiu = (qRange <= 5.0) && (aRange <= 0.0005);
 
-            if (convergiu)
-                r1.QualityStatus = "OfficialRechecked";
-            else
-                r1.QualityStatus = "ReviewRequired";
+            r1.QualityStatus = convergiu ? "OfficialRechecked" : "ReviewRequired";
 
-            // Monta um pequeno resumo da reanálise para anexo ao ShortReport
             var sb = new StringBuilder();
             sb.AppendLine();
             sb.AppendLine("--- Reanálise automática (BLOCO 2) ---");
             sb.AppendLine($"Rodadas: 3");
             sb.AppendLine($"QualityIndex: {q1:F1}, {q2:F1}, {q3:F1} (range={qRange:F1})");
             sb.AppendLine($"PctAu: {a1:P4}, {a2:P4}, {a3:P4} (range={aRange:P4})");
-            sb.AppendLine($"Decisão: {(convergiu ? "OfficialRechecked" : "ReviewRequired")}");
+            sb.AppendLine($"Decisão: {r1.QualityStatus}");
 
             r1.ShortReport = (r1.ShortReport ?? string.Empty) + sb.ToString();
 
@@ -212,7 +203,11 @@ namespace HvsMvp.App
                             }
                             else
                             {
-                                lbl.MaterialType = PixelMaterialType.None;
+                                lbl.MaterialType = PixelMaterialType.Metal;
+                                lbl.MaterialId = "MetalOther";
+                                lbl.RawScore = 0.60;
+                                lbl.MaterialConfidence = 0.60;
+                                acc.Other++;
                             }
                         }
 
@@ -248,11 +243,8 @@ namespace HvsMvp.App
             }
 
             double focusScore = focusRaw * 100.0;
-
             double clippingFrac = diagTotal > 0 ? (double)diagClip / diagTotal : 0.0;
-
             double exposureScore = 100.0 * (1.0 - Math.Min(1.0, clippingFrac / 0.2));
-
             double foregroundFraction = (double)sampleCount / Math.Max(1, w * h);
 
             double maskScore;
@@ -285,16 +277,11 @@ namespace HvsMvp.App
             else
                 qualityStatus = "Invalid";
 
-            // -----------------------------
-            // DIAGNÓSTICOS E RESULTADO
-            // -----------------------------
-
             var diag = new ImageDiagnosticsResult
             {
                 FocusScore = focusRaw,
                 SaturationClippingFraction = diagTotal > 0 ? (double)diagClip / diagTotal : 0,
                 ForegroundFraction = (double)sampleCount / Math.Max(1, w * h),
-
                 FocusScorePercent = focusScore,
                 ExposureScore = exposureScore,
                 MaskScore = maskScore,
@@ -316,6 +303,7 @@ namespace HvsMvp.App
 
             double pctAu = (double)auCount / denom;
             double pctPt = (double)ptCount / denom;
+            double pctOther = (double)otherMetal / denom;
 
             result.Metals.Add(new MetalResult
             {
@@ -337,22 +325,31 @@ namespace HvsMvp.App
                 Score = Math.Min(1.0, 0.6 + pctPt * 10.0)
             });
 
+            if (pctOther > 0)
+            {
+                result.Metals.Add(new MetalResult
+                {
+                    Id = "MetalOther",
+                    Name = "Outros metais",
+                    Group = "outros",
+                    PctSample = pctOther,
+                    PpmEstimated = pctOther * 1_000_000.0,
+                    Score = Math.Min(1.0, 0.5 + pctOther * 8.0)
+                });
+            }
+
             // -----------------------------
-            // BLOCO 3A – BANCO BÁSICO DE PARTÍCULAS
+            // BLOCO 3A + 3B – BANCO DE PARTÍCULAS BÁSICO
             // -----------------------------
-            // Aqui vamos criar "partículas agregadas por material" (agrupamento bem simples).
-            // Para uma primeira versão:
-            // - Criamos uma partícula agregada para Au (se houver) e outra para Pt (se houver),
-            //   usando a contagem total de pixels e uma posição média aproximada.
 
             var particles = new List<ParticleRecord>();
 
             if (sampleCount > 0)
             {
-                // Acumular centro de massa aproximado para Au e Pt
-                long auPx = 0, ptPx = 0;
+                long auPx = 0, ptPx = 0, otherPx = 0;
                 long auSumX = 0, auSumY = 0;
                 long ptSumX = 0, ptSumY = 0;
+                long otherSumX = 0, otherSumY = 0;
 
                 for (int y = 0; y < h; y++)
                 {
@@ -374,6 +371,12 @@ namespace HvsMvp.App
                             ptSumX += x;
                             ptSumY += y;
                         }
+                        else if (string.Equals(lbl.MaterialId, "MetalOther", StringComparison.OrdinalIgnoreCase))
+                        {
+                            otherPx++;
+                            otherSumX += x;
+                            otherSumY += y;
+                        }
                     }
                 }
 
@@ -382,13 +385,11 @@ namespace HvsMvp.App
                     int cx = (int)(auSumX / auPx);
                     int cy = (int)(auSumY / auPx);
 
-                    double conf = 0.95; // mesma lógica da detecção de pixel de Au
-
                     particles.Add(new ParticleRecord
                     {
                         AnalysisId = result.Id,
                         MaterialId = "Au",
-                        Confidence = conf,
+                        Confidence = 0.95,
                         ApproxAreaPixels = (int)auPx,
                         CenterX = cx,
                         CenterY = cy
@@ -400,14 +401,28 @@ namespace HvsMvp.App
                     int cx = (int)(ptSumX / ptPx);
                     int cy = (int)(ptSumY / ptPx);
 
-                    double conf = 0.80; // mesma lógica da detecção de pixel de Pt
-
                     particles.Add(new ParticleRecord
                     {
                         AnalysisId = result.Id,
                         MaterialId = "Pt",
-                        Confidence = conf,
+                        Confidence = 0.80,
                         ApproxAreaPixels = (int)ptPx,
+                        CenterX = cx,
+                        CenterY = cy
+                    });
+                }
+
+                if (otherPx > 0)
+                {
+                    int cx = (int)(otherSumX / otherPx);
+                    int cy = (int)(otherSumY / otherPx);
+
+                    particles.Add(new ParticleRecord
+                    {
+                        AnalysisId = result.Id,
+                        MaterialId = "MetalOther",
+                        Confidence = 0.60,
+                        ApproxAreaPixels = (int)otherPx,
                         CenterX = cx,
                         CenterY = cy
                     });
