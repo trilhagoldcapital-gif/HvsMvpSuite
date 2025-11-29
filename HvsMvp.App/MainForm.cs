@@ -307,104 +307,28 @@ namespace HvsMvp.App
 
         private void InitializeLayout()
         {
-            // PR9: New Ribbon-style header with grouped buttons
+            // PR11: Clean, simple layout for 1366x768 compatibility
+            // Structure: Header (28px) -> Main Toolbar (36px) -> Status Bar (22px) -> Content -> Footer (22px)
+            // Total header: 86px - leaves plenty of room for content
+            
             _topContainer = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 155,
+                Height = 86,
                 BackColor = Color.FromArgb(8, 16, 28)
             };
             Controls.Add(_topContainer);
 
-            var topLayout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 4,
-                Margin = new Padding(0),
-                Padding = new Padding(0)
-            };
-            // PR9: Header bar (gold), Quick access + Title, Ribbon groups, Status bar
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));  // Header bar
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));  // Ribbon groups
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));  // Third row
-            topLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 23));  // Status info bar
-            _topContainer.Controls.Add(topLayout);
-
-            // PR9: Header bar with title and quick access
+            // PR11: Header bar (gold) with title and language selector
             _headerBar = new Panel
             {
-                Dock = DockStyle.Fill,
+                Dock = DockStyle.Top,
+                Height = 28,
                 BackColor = Color.FromArgb(200, 160, 60),
                 Padding = new Padding(8, 2, 8, 2)
             };
-            topLayout.Controls.Add(_headerBar, 0, 0);
+            _topContainer.Controls.Add(_headerBar);
 
-            var headerLayout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 3,
-                RowCount = 1,
-                Margin = new Padding(0)
-            };
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 320));  // Quick access
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));   // Title
-            headerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));       // Language
-            headerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            _headerBar.Controls.Add(headerLayout);
-
-            // PR9: Quick Access bar
-            _quickAccessBar = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Padding = new Padding(0) };
-            var quickAccessFlow = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
-            };
-            _quickAccessBar.Controls.Add(quickAccessFlow);
-            headerLayout.Controls.Add(_quickAccessBar, 0, 0);
-
-            Button QuickBtn(string text, string tooltip)
-            {
-                var b = new Button
-                {
-                    Text = text,
-                    Size = new Size(28, 22),
-                    Margin = new Padding(2, 0, 2, 0),
-                    Padding = new Padding(0),
-                    BackColor = Color.FromArgb(40, 50, 70),
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Segoe UI", 10)
-                };
-                b.FlatAppearance.BorderColor = Color.FromArgb(60, 80, 100);
-                b.FlatAppearance.BorderSize = 1;
-                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(60, 80, 110);
-                _hvsToolTip.SetToolTip(b, tooltip);
-                return b;
-            }
-
-            _btnQuickOpen = QuickBtn("📂", "Abrir imagem");
-            _btnQuickOpen.Click += BtnOpenImage_Click;
-            quickAccessFlow.Controls.Add(_btnQuickOpen);
-
-            _btnQuickLive = QuickBtn("▶", "Live (câmera)");
-            _btnQuickLive.BackColor = Color.FromArgb(40, 80, 60);
-            _btnQuickLive.Click += BtnLive_Click;
-            quickAccessFlow.Controls.Add(_btnQuickLive);
-
-            _btnQuickAnalyze = QuickBtn("🧪", "Analisar");
-            _btnQuickAnalyze.Click += BtnAnalisar_Click;
-            quickAccessFlow.Controls.Add(_btnQuickAnalyze);
-
-            _btnQuickPdf = QuickBtn("📄", "Laudo PDF");
-            _btnQuickPdf.BackColor = Color.FromArgb(80, 60, 40);
-            _btnQuickPdf.Click += BtnPdf_Click;
-            quickAccessFlow.Controls.Add(_btnQuickPdf);
-
-            // PR9: Title label centered
             _lblTitle = new Label
             {
                 AutoSize = false,
@@ -413,7 +337,7 @@ namespace HvsMvp.App
                 Font = new Font("Segoe UI", 11, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleCenter
             };
-            headerLayout.Controls.Add(_lblTitle, 1, 0);
+            _headerBar.Controls.Add(_lblTitle);
 
             _languageMenu = new ContextMenuStrip();
             _languageMenu.Items.Add("Português (pt-BR)", null, (s, e) => SetLanguage("pt-BR"));
@@ -425,26 +349,28 @@ namespace HvsMvp.App
 
             _btnLanguage = new Button
             {
-                Text = "Idioma ▾",
-                Size = new Size(100, 22),
+                Text = "🌐",
+                Size = new Size(32, 22),
+                Dock = DockStyle.Right,
                 BackColor = Color.FromArgb(40, 40, 60),
                 ForeColor = Color.WhiteSmoke,
-                FlatStyle = FlatStyle.Flat,
-                Margin = new Padding(4, 0, 0, 0)
+                FlatStyle = FlatStyle.Flat
             };
-            _btnLanguage.FlatAppearance.BorderColor = Color.FromArgb(30, 30, 50);
-            _btnLanguage.FlatAppearance.BorderSize = 1;
+            _btnLanguage.FlatAppearance.BorderSize = 0;
             _btnLanguage.Click += BtnLanguage_Click;
-            headerLayout.Controls.Add(_btnLanguage, 2, 0);
+            _hvsToolTip.SetToolTip(_btnLanguage, "Idioma / Language");
+            _headerBar.Controls.Add(_btnLanguage);
 
-            // PR9: Ribbon toolbar with grouped buttons
-            var ribbonPanel = new Panel
+            // PR11: Main toolbar - single row with all main buttons visible
+            var mainToolbar = new Panel
             {
-                Dock = DockStyle.Fill,
+                Dock = DockStyle.Top,
+                Height = 36,
                 BackColor = Color.FromArgb(12, 24, 40),
                 Padding = new Padding(4, 2, 4, 2)
             };
-            topLayout.Controls.Add(ribbonPanel, 0, 1);
+            _topContainer.Controls.Add(mainToolbar);
+            mainToolbar.BringToFront();
 
             _toolbarRow1 = new FlowLayoutPanel
             {
@@ -454,369 +380,240 @@ namespace HvsMvp.App
                 AutoScroll = true,
                 Padding = new Padding(0)
             };
-            ribbonPanel.Controls.Add(_toolbarRow1);
+            mainToolbar.Controls.Add(_toolbarRow1);
 
-            // PR9: Third row for additional controls
-            var toolbarPanel3 = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(10, 20, 35),
-                Padding = new Padding(4, 2, 4, 2)
-            };
-            topLayout.Controls.Add(toolbarPanel3, 0, 2);
-
-            _toolbarRow3 = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                AutoScroll = true,
-                Padding = new Padding(0)
-            };
-            toolbarPanel3.Controls.Add(_toolbarRow3);
-
-            // PR10: Status info bar with professional format
-            _statusInfoBar = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(12, 22, 38),
-                Padding = new Padding(8, 2, 8, 2)
-            };
-            topLayout.Controls.Add(_statusInfoBar, 0, 3);
-
-            _lblStatusInfo = new Label
-            {
-                Dock = DockStyle.Fill,
-                ForeColor = Color.FromArgb(160, 175, 195),
-                Font = new Font("Segoe UI", 8.5f),
-                TextAlign = ContentAlignment.MiddleLeft,
-                Text = "ORIGEM: –  •  MODO: –  •  ALVO: –  •  FOCO: –  •  MÁSCARA: –"
-            };
-            _statusInfoBar.Controls.Add(_lblStatusInfo);
-
-            // PR9: Helper to create ribbon group panel
-            Panel CreateRibbonGroup(string groupLabel)
-            {
-                var grp = new Panel
-                {
-                    AutoSize = true,
-                    MinimumSize = new Size(60, 65),
-                    MaximumSize = new Size(400, 68),
-                    BackColor = Color.FromArgb(18, 32, 50),
-                    Margin = new Padding(2, 0, 2, 0),
-                    Padding = new Padding(4, 2, 4, 0)
-                };
-
-                var innerFlow = new FlowLayoutPanel
-                {
-                    Dock = DockStyle.Top,
-                    Height = 48,
-                    FlowDirection = FlowDirection.LeftToRight,
-                    WrapContents = false,
-                    AutoSize = true,
-                    Padding = new Padding(0)
-                };
-                grp.Controls.Add(innerFlow);
-
-                var lbl = new Label
-                {
-                    Dock = DockStyle.Bottom,
-                    Height = 16,
-                    Text = groupLabel,
-                    ForeColor = Color.FromArgb(150, 165, 190),
-                    Font = new Font("Segoe UI", 7.5f),
-                    TextAlign = ContentAlignment.MiddleCenter
-                };
-                grp.Controls.Add(lbl);
-                grp.Tag = innerFlow;
-                return grp;
-            }
-
-            // PR9: Helper to create ribbon button
-            Button RibbonBtn(string text, bool highlight = false)
+            // PR11: Helper to create toolbar buttons (compact, visible)
+            Button ToolbarBtn(string text, string tooltip, bool highlight = false, bool primary = false)
             {
                 var b = new Button
                 {
                     Text = text,
                     AutoSize = true,
-                    MinimumSize = new Size(32, 42),
-                    MaximumSize = new Size(120, 44),
-                    Margin = new Padding(1, 0, 1, 0),
-                    Padding = new Padding(6, 0, 6, 0),
-                    BackColor = highlight ? Color.FromArgb(40, 70, 100) : Color.FromArgb(25, 45, 70),
+                    MinimumSize = new Size(60, 28),
+                    MaximumSize = new Size(100, 30),
+                    Margin = new Padding(2, 1, 2, 1),
+                    Padding = new Padding(4, 0, 4, 0),
+                    BackColor = primary ? Color.FromArgb(50, 90, 130) : 
+                                highlight ? Color.FromArgb(40, 70, 100) : Color.FromArgb(25, 45, 70),
                     ForeColor = Color.WhiteSmoke,
                     FlatStyle = FlatStyle.Flat,
                     Font = new Font("Segoe UI", 8.5f),
                     TextAlign = ContentAlignment.MiddleCenter
                 };
-                b.FlatAppearance.BorderColor = highlight ? Color.FromArgb(80, 120, 160) : Color.FromArgb(50, 70, 100);
+                b.FlatAppearance.BorderColor = primary ? Color.FromArgb(100, 150, 200) :
+                                               highlight ? Color.FromArgb(80, 120, 160) : Color.FromArgb(50, 70, 100);
                 b.FlatAppearance.BorderSize = 1;
-                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(40, 70, 110);
-                b.FlatAppearance.MouseDownBackColor = Color.FromArgb(50, 90, 140);
+                b.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 85, 130);
+                b.FlatAppearance.MouseDownBackColor = Color.FromArgb(60, 100, 150);
+                _hvsToolTip.SetToolTip(b, tooltip);
                 return b;
             }
 
-            // PR9: Grupo AQUISIÇÃO
-            var grpAquisicao = CreateRibbonGroup("AQUISIÇÃO");
-            var flowAquisicao = (FlowLayoutPanel)grpAquisicao.Tag!;
-            _toolbarRow1.Controls.Add(grpAquisicao);
-
-            _btnOpen = RibbonBtn("📂 Abrir");
-            _btnOpen.Click += BtnOpenImage_Click;
-            flowAquisicao.Controls.Add(_btnOpen);
-
-            _btnLive = RibbonBtn("▶ Live", highlight: true);
-            _btnLive.Click += BtnLive_Click;
-            flowAquisicao.Controls.Add(_btnLive);
-
-            _btnContinuous = RibbonBtn("⚙ Cont.");
-            _btnContinuous.Click += BtnContinuous_Click;
-            flowAquisicao.Controls.Add(_btnContinuous);
-
-            _btnStopLive = RibbonBtn("⏹ Parar");
-            _btnStopLive.Click += BtnParar_Click;
-            flowAquisicao.Controls.Add(_btnStopLive);
-
-            _btnStopContinuous = RibbonBtn("⏸ Parar");
-            _btnStopContinuous.Click += BtnStopContinuous_Click;
-            flowAquisicao.Controls.Add(_btnStopContinuous);
-
-            _btnCameraSel = RibbonBtn("🎥 Câm.");
-            _btnCameraSel.Click += BtnSelecionarCamera_Click;
-            flowAquisicao.Controls.Add(_btnCameraSel);
-
-            _btnResolucaoSel = RibbonBtn("⚙ Res.");
-            _btnResolucaoSel.Click += BtnSelecionarResolucao_Click;
-            flowAquisicao.Controls.Add(_btnResolucaoSel);
-
-            // PR9: Grupo ANÁLISE
-            var grpAnalise = CreateRibbonGroup("ANÁLISE");
-            var flowAnalise = (FlowLayoutPanel)grpAnalise.Tag!;
-            _toolbarRow1.Controls.Add(grpAnalise);
-
-            _btnAnalyze = RibbonBtn("🧪 Analisar", highlight: true);
-            _btnAnalyze.Click += BtnAnalisar_Click;
-            flowAnalise.Controls.Add(_btnAnalyze);
-
-            _btnSelectiveAnalyze = RibbonBtn("🎯 Seletiva");
-            _btnSelectiveAnalyze.Click += BtnSelectiveAnalyze_Click;
-            flowAnalise.Controls.Add(_btnSelectiveAnalyze);
-
-            _btnMask = RibbonBtn("🎨 Máscara");
-            _btnMask.Click += BtnMascara_Click;
-            flowAnalise.Controls.Add(_btnMask);
-
-            _btnMaskBg = RibbonBtn("🖼 Fundo");
-            _btnMaskBg.Click += BtnFundoMasc_Click;
-            flowAnalise.Controls.Add(_btnMaskBg);
-
-            _btnPhaseMap = RibbonBtn("🗺 Fases");
-            _btnPhaseMap.Click += BtnPhaseMap_Click;
-            flowAnalise.Controls.Add(_btnPhaseMap);
-
-            _btnHeatmap = RibbonBtn("🔥 Heatmap");
-            _btnHeatmap.Click += BtnHeatmap_Click;
-            flowAnalise.Controls.Add(_btnHeatmap);
-
-            // PR9: Grupo VISUALIZAÇÃO
-            var grpVisualizacao = CreateRibbonGroup("VISUALIZAÇÃO");
-            var flowVisualizacao = (FlowLayoutPanel)grpVisualizacao.Tag!;
-            _toolbarRow1.Controls.Add(grpVisualizacao);
-
-            _btnZoomIn = RibbonBtn("🔍 Zoom+");
-            _btnZoomIn.Click += BtnZoomMais_Click;
-            flowVisualizacao.Controls.Add(_btnZoomIn);
-
-            _btnZoomOut = RibbonBtn("🔎 Zoom-");
-            _btnZoomOut.Click += BtnZoomMenos_Click;
-            flowVisualizacao.Controls.Add(_btnZoomOut);
-
-            _btnScale = RibbonBtn("📏 Escala");
-            _btnScale.Click += BtnEscala_Click;
-            flowVisualizacao.Controls.Add(_btnScale);
-
-            _btnWB = RibbonBtn("⚪ Branco");
-            _btnWB.Click += BtnBalanco_Click;
-            flowVisualizacao.Controls.Add(_btnWB);
-
-            // Target combo in visualization group
-            var targetPanel = new Panel { Size = new Size(135, 44), Margin = new Padding(2, 0, 2, 0) };
-            var lblAlvo = new Label
+            // PR11: Separator helper
+            Panel ToolbarSeparator()
             {
-                Text = "Alvo:",
-                Location = new Point(0, 2),
-                AutoSize = true,
-                ForeColor = Color.Gainsboro,
-                Font = new Font("Segoe UI", 8)
-            };
-            targetPanel.Controls.Add(lblAlvo);
+                return new Panel
+                {
+                    Width = 2,
+                    Height = 28,
+                    BackColor = Color.FromArgb(50, 70, 100),
+                    Margin = new Padding(4, 2, 4, 2)
+                };
+            }
+
+            // PR11: AQUISIÇÃO buttons
+            _btnOpen = ToolbarBtn("📂 Abrir", "Abrir imagem de arquivo", primary: true);
+            _btnOpen.Click += BtnOpenImage_Click;
+            _toolbarRow1.Controls.Add(_btnOpen);
+
+            _btnLive = ToolbarBtn("▶ Live", "Iniciar câmera ao vivo", primary: true);
+            _btnLive.Click += BtnLive_Click;
+            _toolbarRow1.Controls.Add(_btnLive);
+
+            _btnStopLive = ToolbarBtn("⏹ Parar", "Parar câmera");
+            _btnStopLive.Click += BtnParar_Click;
+            _toolbarRow1.Controls.Add(_btnStopLive);
+
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
+
+            // PR11: ANÁLISE buttons
+            _btnAnalyze = ToolbarBtn("🧪 Analisar", "Executar análise completa", primary: true);
+            _btnAnalyze.Click += BtnAnalisar_Click;
+            _toolbarRow1.Controls.Add(_btnAnalyze);
+
+            _btnMask = ToolbarBtn("🎨 Másc.", "Ver máscara de segmentação");
+            _btnMask.Click += BtnMascara_Click;
+            _toolbarRow1.Controls.Add(_btnMask);
+
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
+
+            // PR11: RELATÓRIOS buttons
+            _btnPdf = ToolbarBtn("📄 PDF", "Exportar laudo PDF", primary: true);
+            _btnPdf.Click += BtnPdf_Click;
+            _toolbarRow1.Controls.Add(_btnPdf);
+
+            _btnTxt = ToolbarBtn("📝 TXT", "Exportar laudo TXT");
+            _btnTxt.Click += BtnTxt_Click;
+            _toolbarRow1.Controls.Add(_btnTxt);
+
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
+
+            // PR11: ZOOM buttons
+            _btnZoomIn = ToolbarBtn("🔍+", "Aumentar zoom");
+            _btnZoomIn.MinimumSize = new Size(40, 28);
+            _btnZoomIn.Click += BtnZoomMais_Click;
+            _toolbarRow1.Controls.Add(_btnZoomIn);
+
+            _btnZoomOut = ToolbarBtn("🔍-", "Diminuir zoom");
+            _btnZoomOut.MinimumSize = new Size(40, 28);
+            _btnZoomOut.Click += BtnZoomMenos_Click;
+            _toolbarRow1.Controls.Add(_btnZoomOut);
+
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
+
+            // PR11: Target combo (compact)
+            var targetPanel = new Panel { Size = new Size(120, 28), Margin = new Padding(2, 2, 2, 2) };
             _cbTarget = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(0, 18),
-                Size = new Size(130, 22),
+                Location = new Point(0, 2),
+                Size = new Size(116, 24),
                 BackColor = Color.FromArgb(32, 32, 44),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8)
             };
             targetPanel.Controls.Add(_cbTarget);
-            flowVisualizacao.Controls.Add(targetPanel);
+            _toolbarRow1.Controls.Add(targetPanel);
 
-            // PR8 checkboxes in visualization group
-            var chkPanel = new Panel { Size = new Size(80, 44), Margin = new Padding(2, 0, 2, 0) };
-            _chkXrayMode = new CheckBox
-            {
-                Text = "X-ray",
-                ForeColor = Color.Gainsboro,
-                BackColor = Color.Transparent,
-                Location = new Point(0, 4),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 8),
-                Checked = false
-            };
-            _chkXrayMode.CheckedChanged += ChkXrayMode_CheckedChanged;
-            chkPanel.Controls.Add(_chkXrayMode);
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
 
-            _chkShowUncertainty = new CheckBox
-            {
-                Text = "Incerteza",
-                ForeColor = Color.Gainsboro,
-                BackColor = Color.Transparent,
-                Location = new Point(0, 24),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 8),
-                Checked = false
-            };
-            _chkShowUncertainty.CheckedChanged += ChkShowUncertainty_CheckedChanged;
-            chkPanel.Controls.Add(_chkShowUncertainty);
-            flowVisualizacao.Controls.Add(chkPanel);
-
-            // PR9: Grupo RELATÓRIOS
-            var grpRelatorios = CreateRibbonGroup("RELATÓRIOS");
-            var flowRelatorios = (FlowLayoutPanel)grpRelatorios.Tag!;
-            _toolbarRow1.Controls.Add(grpRelatorios);
-
-            _btnTxt = RibbonBtn("📝 TXT");
-            _btnTxt.Click += BtnTxt_Click;
-            flowRelatorios.Controls.Add(_btnTxt);
-
-            _btnPdf = RibbonBtn("📄 PDF", highlight: true);
-            _btnPdf.Click += BtnPdf_Click;
-            flowRelatorios.Controls.Add(_btnPdf);
-
-            _btnJson = RibbonBtn("{} JSON");
-            _btnJson.Click += BtnJson_Click;
-            flowRelatorios.Controls.Add(_btnJson);
-
-            _btnCsv = RibbonBtn("📊 CSV");
-            _btnCsv.Click += BtnCsv_Click;
-            flowRelatorios.Controls.Add(_btnCsv);
-
-            _btnBiCsv = RibbonBtn("📈 BI");
-            _btnBiCsv.Click += BtnBiCsv_Click;
-            flowRelatorios.Controls.Add(_btnBiCsv);
-
-            // PR9: Grupo IA / QA
-            var grpIaQa = CreateRibbonGroup("IA / QA");
-            var flowIaQa = (FlowLayoutPanel)grpIaQa.Tag!;
-            _toolbarRow1.Controls.Add(grpIaQa);
-
-            _btnAi = RibbonBtn("🔬 Partíc.");
-            _btnAi.Click += BtnParticulas_Click;
-            flowIaQa.Controls.Add(_btnAi);
-
-            _btnExportIa = RibbonBtn("🤖 Dataset");
-            _btnExportIa.Click += BtnExportIa_Click;
-            flowIaQa.Controls.Add(_btnExportIa);
-
-            _btnQaPanel = RibbonBtn("✅ QA");
-            _btnQaPanel.Click += BtnQaPanel_Click;
-            flowIaQa.Controls.Add(_btnQaPanel);
-
-            // PR9: Grupo SISTEMA (in row 3)
-            var grpSistema = CreateRibbonGroup("SISTEMA");
-            var flowSistema = (FlowLayoutPanel)grpSistema.Tag!;
-            _toolbarRow3.Controls.Add(grpSistema);
-
-            _btnSettings = RibbonBtn("⚙️ Config.");
+            // PR11: SISTEMA buttons (compact)
+            _btnSettings = ToolbarBtn("⚙️", "Configurações");
+            _btnSettings.MinimumSize = new Size(32, 28);
             _btnSettings.Click += BtnSettings_Click;
-            flowSistema.Controls.Add(_btnSettings);
+            _toolbarRow1.Controls.Add(_btnSettings);
 
-            _btnTraining = RibbonBtn("🎯 Treino");
-            _btnTraining.Click += BtnTraining_Click;
-            flowSistema.Controls.Add(_btnTraining);
-
-            _btnAbout = RibbonBtn("ℹ️ Sobre");
+            _btnAbout = ToolbarBtn("ℹ️", "Sobre o aplicativo");
+            _btnAbout.MinimumSize = new Size(32, 28);
             _btnAbout.Click += BtnAbout_Click;
-            flowSistema.Controls.Add(_btnAbout);
+            _toolbarRow1.Controls.Add(_btnAbout);
 
-            _btnWhatsApp = RibbonBtn("📱 WhatsApp");
+            // PR11: Status info bar
+            _statusInfoBar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 22,
+                BackColor = Color.FromArgb(12, 22, 38),
+                Padding = new Padding(8, 2, 8, 2)
+            };
+            _topContainer.Controls.Add(_statusInfoBar);
+            _statusInfoBar.BringToFront();
+
+            _lblStatusInfo = new Label
+            {
+                Dock = DockStyle.Fill,
+                ForeColor = Color.FromArgb(160, 175, 195),
+                Font = new Font("Segoe UI", 8f),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Text = "ORIGEM: –  •  MODO: –  •  ALVO: –"
+            };
+            _statusInfoBar.Controls.Add(_lblStatusInfo);
+
+            // PR11: Initialize hidden buttons (for compatibility with existing code)
+            // These buttons are not in the main toolbar but can be accessed via menus or other means
+            _btnContinuous = new Button { Visible = false };
+            _btnContinuous.Click += BtnContinuous_Click;
+            _btnStopContinuous = new Button { Visible = false };
+            _btnStopContinuous.Click += BtnStopContinuous_Click;
+            _btnCameraSel = new Button { Visible = false };
+            _btnCameraSel.Click += BtnSelecionarCamera_Click;
+            _btnResolucaoSel = new Button { Visible = false };
+            _btnResolucaoSel.Click += BtnSelecionarResolucao_Click;
+            _btnSelectiveAnalyze = new Button { Visible = false };
+            _btnSelectiveAnalyze.Click += BtnSelectiveAnalyze_Click;
+            _btnMaskBg = new Button { Visible = false };
+            _btnMaskBg.Click += BtnFundoMasc_Click;
+            _btnPhaseMap = new Button { Visible = false };
+            _btnPhaseMap.Click += BtnPhaseMap_Click;
+            _btnHeatmap = new Button { Visible = false };
+            _btnHeatmap.Click += BtnHeatmap_Click;
+            _btnScale = new Button { Visible = false };
+            _btnScale.Click += BtnEscala_Click;
+            _btnWB = new Button { Visible = false };
+            _btnWB.Click += BtnBalanco_Click;
+            _btnJson = new Button { Visible = false };
+            _btnJson.Click += BtnJson_Click;
+            _btnCsv = new Button { Visible = false };
+            _btnCsv.Click += BtnCsv_Click;
+            _btnBiCsv = new Button { Visible = false };
+            _btnBiCsv.Click += BtnBiCsv_Click;
+            _btnAi = new Button { Visible = false };
+            _btnAi.Click += BtnParticulas_Click;
+            _btnExportIa = new Button { Visible = false };
+            _btnExportIa.Click += BtnExportIa_Click;
+            _btnQaPanel = new Button { Visible = false };
+            _btnQaPanel.Click += BtnQaPanel_Click;
+            _btnTraining = new Button { Visible = false };
+            _btnTraining.Click += BtnTraining_Click;
+            _btnWhatsApp = new Button { Visible = false };
             _btnWhatsApp.Click += BtnWhatsApp_Click;
-            flowSistema.Controls.Add(_btnWhatsApp);
-
-            _btnDebugHvs = RibbonBtn("🛠 Debug");
+            _btnDebugHvs = new Button { Visible = false };
             _btnDebugHvs.Click += BtnDebugHvs_Click;
-            flowSistema.Controls.Add(_btnDebugHvs);
-
-            _btnCalib = RibbonBtn("📸 Calib.");
+            _btnCalib = new Button { Visible = false };
             _btnCalib.Click += BtnCalibrarAuto_Click;
-            flowSistema.Controls.Add(_btnCalib);
+            
+            // PR11: Quick access buttons (for compatibility)
+            _btnQuickOpen = _btnOpen;
+            _btnQuickLive = _btnLive;
+            _btnQuickAnalyze = _btnAnalyze;
+            _btnQuickPdf = _btnPdf;
+            
+            // PR11: Checkboxes (hidden, for compatibility)
+            _chkXrayMode = new CheckBox { Visible = false, Checked = false };
+            _chkXrayMode.CheckedChanged += ChkXrayMode_CheckedChanged;
+            _chkShowUncertainty = new CheckBox { Visible = false, Checked = false };
+            _chkShowUncertainty.CheckedChanged += ChkShowUncertainty_CheckedChanged;
+            
+            // PR11: Quick access bar (for compatibility)
+            _quickAccessBar = new Panel { Visible = false };
+            
+            // PR11: Toolbar rows (for compatibility)
+            _toolbarRow2 = _toolbarRow1;
+            _toolbarRow3 = _toolbarRow1;
 
-            // Legacy reference for compatibility
-            _toolbarRow2 = _toolbarRow3;
-
+            // PR11: Main content area - simple split: top (image+materials) / bottom (log)
             _mainVerticalSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Horizontal,
-                SplitterWidth = 6,
+                SplitterWidth = 4,
                 BackColor = Color.FromArgb(30, 30, 50),
-                FixedPanel = FixedPanel.None,
+                FixedPanel = FixedPanel.Panel2,
                 IsSplitterFixed = false
             };
             Controls.Add(_mainVerticalSplit);
+            _mainVerticalSplit.BringToFront();
 
-            _mainVerticalSplit.Panel1MinSize = 100;
-            _mainVerticalSplit.Panel2MinSize = 200;
+            _mainVerticalSplit.Panel1MinSize = 200;
+            _mainVerticalSplit.Panel2MinSize = 80;
 
-            Controls.Remove(_topContainer);
-            _mainVerticalSplit.Panel1.Controls.Add(_topContainer);
-            _topContainer.Dock = DockStyle.Fill;
-
-            this.Load += (s, e) =>
-            {
-                _mainVerticalSplit.SplitterDistance = (int)(ClientSize.Height * 0.20);
-            };
-
+            // PR11: Upper area split - left (image) / right (materials)
             _contentVerticalSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterWidth = 6,
-                BackColor = Color.FromArgb(25, 30, 45),
-                FixedPanel = FixedPanel.None,
-                IsSplitterFixed = false
-            };
-            _mainVerticalSplit.Panel2.Controls.Add(_contentVerticalSplit);
-
-            _contentVerticalSplit.Panel1MinSize = 200;
-            _contentVerticalSplit.Panel2MinSize = 100;
-            _contentVerticalSplit.SplitterDistance = (int)(ClientSize.Height * 0.6);
-
-            _cameraMaterialsSplit = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
-                SplitterWidth = 6,
+                SplitterWidth = 4,
                 BackColor = Color.FromArgb(25, 30, 45),
-                FixedPanel = FixedPanel.None,
+                FixedPanel = FixedPanel.Panel2,
                 IsSplitterFixed = false
             };
-            _contentVerticalSplit.Panel1.Controls.Add(_cameraMaterialsSplit);
+            _mainVerticalSplit.Panel1.Controls.Add(_contentVerticalSplit);
 
-            _cameraMaterialsSplit.Panel1MinSize = 300;
-            _cameraMaterialsSplit.Panel2MinSize = 250;
-            _cameraMaterialsSplit.SplitterDistance = (int)(ClientSize.Width * 0.63);
+            _contentVerticalSplit.Panel1MinSize = 300;
+            _contentVerticalSplit.Panel2MinSize = 200;
+
+            // PR11: For compatibility with old code
+            _cameraMaterialsSplit = _contentVerticalSplit;
 
             _imagePanel = new Panel
             {
@@ -938,14 +735,14 @@ namespace HvsMvp.App
             _listGems.SelectedIndexChanged += (s, e) =>
                 ShowMaterialDetails(_config?.Materials?.Gemas?.ElementAtOrDefault(_listGems.SelectedIndex));
 
-            // PR9: Log panel with control bar
+            // PR11: Log panel with control bar (in bottom panel of main split)
             var logContainer = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(6, 14, 24),
                 Padding = new Padding(0)
             };
-            _contentVerticalSplit.Panel2.Controls.Add(logContainer);
+            _mainVerticalSplit.Panel2.Controls.Add(logContainer);
 
             // PR9: Log control bar
             _logControlPanel = new Panel
@@ -1053,10 +850,28 @@ namespace HvsMvp.App
             _footerPanel.Controls.Add(_lblVersion);
 
             ApplyLocaleTexts();
-            lblAlvo.Text = _i18n[_currentLocale]["label.target"];
             
-            // PR9: Initialize button enabled states
+            // PR11: Initialize button enabled states
             UpdateButtonEnabledStates();
+            
+            // PR11: Set initial splitter distance after load
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    // Image panel takes ~65% of width
+                    if (_contentVerticalSplit != null && _contentVerticalSplit.Width > 0)
+                    {
+                        _contentVerticalSplit.SplitterDistance = (int)(_contentVerticalSplit.Width * 0.65);
+                    }
+                    // Log panel takes ~20% of height
+                    if (_mainVerticalSplit != null && _mainVerticalSplit.Height > 0)
+                    {
+                        _mainVerticalSplit.SplitterDistance = (int)(_mainVerticalSplit.Height * 0.80);
+                    }
+                }
+                catch { } // Ignore layout errors during load
+            };
         }
 
         private void ApplyLocaleTexts()
@@ -1073,9 +888,8 @@ namespace HvsMvp.App
             // PR9: Update status info bar
             UpdateStatusInfoBar();
 
-            // PR9: Ribbon buttons use short, consistent text; no need to update per locale
-            // Buttons now show icons and brief text directly in their initialization.
-            _btnLanguage.Text = $"Idioma ({_currentLocale}) ▾";
+            // PR11: Language button shows just an icon now
+            // _btnLanguage.Text is already set in InitializeLayout
 
             // Update training mode button state
             UpdateTrainingModeButton();
