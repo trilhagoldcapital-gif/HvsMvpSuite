@@ -266,6 +266,16 @@ namespace HvsMvp.App
 
             // Apply settings to camera
             _cameraIndex = _appSettings.DefaultCameraIndex;
+            
+            // Safer default camera index: clamp to valid range [0, 7]
+            // Many systems expose the primary webcam at index 0
+            bool cameraIndexAdjusted = false;
+            if (_cameraIndex < 0 || _cameraIndex > 7)
+            {
+                _cameraIndex = 0;
+                cameraIndexAdjusted = true;
+            }
+            
             _cameraWidth = _appSettings.GetResolutionWidth();
             _cameraHeight = _appSettings.GetResolutionHeight();
 
@@ -277,6 +287,12 @@ namespace HvsMvp.App
             InitializeLayout();
             InitializeCameraEvents();
             PopulateMaterials();
+            
+            // Log camera index adjustment after UI is initialized
+            if (cameraIndexAdjusted)
+            {
+                AppendLog("Índice de câmera inválido nos settings, usando 0.");
+            }
             
             // PR15: Apply operation profile to UI
             ApplyOperationProfile(_appSettings.CurrentProfile);
@@ -834,6 +850,8 @@ namespace HvsMvp.App
 
             // Add ZoomPanControl to image panel
             _imagePanel.Controls.Add(_zoomPanControl);
+            // Z-order: Ensure ZoomPanControl is visible on top, not hidden behind other controls
+            _zoomPanControl.BringToFront();
 
             // PR16: ROI selection overlay (transparent, on top of zoom control)
             _roiOverlay = new RoiSelectionOverlay(_roiService)
@@ -872,6 +890,8 @@ namespace HvsMvp.App
                 Visible = false
             };
             _imagePanel.Controls.Add(_pictureSample);
+            // Z-order: Send legacy PictureBox to back so it can never cover ZoomPanControl
+            _pictureSample.SendToBack();
             _pictureSample.MouseMove += PictureSample_MouseMove;
 
             _rightPanel = new Panel
@@ -1674,6 +1694,9 @@ namespace HvsMvp.App
                 {
                     try
                     {
+                        // Frame diagnostics: Log frame size to confirm frames are arriving
+                        AppendLog($"Frame recebido: {frame.Width}x{frame.Height}");
+
                         // PR18: Update PictureBox (for analysis compatibility)
                         var oldPicture = _pictureSample.Image;
                         _pictureSample.Image = (Bitmap)frame.Clone();
