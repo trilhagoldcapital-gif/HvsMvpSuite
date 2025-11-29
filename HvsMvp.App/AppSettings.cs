@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
@@ -54,6 +55,37 @@ namespace HvsMvp.App
         /// PR10: If true, skips the welcome screen on startup (operator mode).
         /// </summary>
         public bool SkipWelcomeScreen { get; set; } = false;
+
+        /// <summary>
+        /// PR13: Recent files list for quick access to previously analyzed images.
+        /// Maximum 10 files stored.
+        /// </summary>
+        public List<string> RecentFiles { get; set; } = new List<string>();
+
+        /// <summary>
+        /// PR13: Maximum number of recent files to store.
+        /// </summary>
+        private const int MaxRecentFiles = 10;
+
+        /// <summary>
+        /// PR13: Add a file to the recent files list.
+        /// </summary>
+        public void AddRecentFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return;
+
+            // Remove if already exists (will be moved to top)
+            RecentFiles.RemoveAll(f => string.Equals(f, filePath, StringComparison.OrdinalIgnoreCase));
+            
+            // Insert at beginning
+            RecentFiles.Insert(0, filePath);
+            
+            // Trim to max size
+            while (RecentFiles.Count > MaxRecentFiles)
+            {
+                RecentFiles.RemoveAt(RecentFiles.Count - 1);
+            }
+        }
 
         /// <summary>
         /// Load settings from JSON file. If file doesn't exist, returns default settings.

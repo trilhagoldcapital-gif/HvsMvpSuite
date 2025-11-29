@@ -54,6 +54,9 @@ namespace HvsMvp.App
         private Panel _logControlPanel = null!;
         private Button _btnClearLog = null!;
         private Button _btnSaveLog = null!;
+        
+        // PR13: Recent files menu
+        private ToolStripMenuItem _menuRecentFiles = null!;
 
         private SplitContainer _mainVerticalSplit = null!;
         private SplitContainer _contentVerticalSplit = null!;
@@ -1032,6 +1035,14 @@ namespace HvsMvp.App
             // ===== ARQUIVO (File) Menu =====
             var menuArquivo = new ToolStripMenuItem("📁 Arquivo");
             menuArquivo.DropDownItems.Add(CreateMenuItem("📂 Abrir imagem...", "Ctrl+O", (s, e) => BtnOpenImage_Click(s, e)));
+            
+            // PR13: Add recent files submenu
+            var menuRecentFiles = new ToolStripMenuItem("📋 Arquivos recentes");
+            PopulateRecentFilesMenu(menuRecentFiles);
+            menuArquivo.DropDownItems.Add(menuRecentFiles);
+            // Store reference for updates
+            _menuRecentFiles = menuRecentFiles;
+            
             menuArquivo.DropDownItems.Add(new ToolStripSeparator());
             menuArquivo.DropDownItems.Add(CreateMenuItem("💾 Salvar log...", "Ctrl+S", (s, e) => BtnSaveLog_Click(s, e)));
             menuArquivo.DropDownItems.Add(CreateMenuItem("🗑 Limpar log", null, (s, e) => BtnClearLog_Click(s, e)));
@@ -1273,6 +1284,121 @@ namespace HvsMvp.App
             }
         }
 
+        /// <summary>
+        /// PR13: Populate the recent files menu with stored recent files.
+        /// </summary>
+        private void PopulateRecentFilesMenu(ToolStripMenuItem menu)
+        {
+            menu.DropDownItems.Clear();
+
+            if (_appSettings.RecentFiles.Count == 0)
+            {
+                var emptyItem = new ToolStripMenuItem("(Nenhum arquivo recente)")
+                {
+                    Enabled = false
+                };
+                menu.DropDownItems.Add(emptyItem);
+                return;
+            }
+
+            int index = 1;
+            foreach (var filePath in _appSettings.RecentFiles)
+            {
+                if (string.IsNullOrWhiteSpace(filePath)) continue;
+                
+                string displayName = Path.GetFileName(filePath);
+                if (displayName.Length > 40)
+                {
+                    displayName = "..." + displayName.Substring(displayName.Length - 37);
+                }
+                
+                string menuText = $"{index}. {displayName}";
+                var item = new ToolStripMenuItem(menuText);
+                item.ToolTipText = filePath;
+                
+                // Capture the file path for the click handler
+                string capturedPath = filePath;
+                item.Click += (s, e) => OpenRecentFile(capturedPath);
+                
+                menu.DropDownItems.Add(item);
+                index++;
+            }
+
+            menu.DropDownItems.Add(new ToolStripSeparator());
+            var clearItem = new ToolStripMenuItem("🗑 Limpar lista");
+            clearItem.Click += (s, e) => ClearRecentFiles();
+            menu.DropDownItems.Add(clearItem);
+        }
+
+        /// <summary>
+        /// PR13: Open a recent file.
+        /// </summary>
+        private void OpenRecentFile(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                MessageBox.Show(
+                    this,
+                    $"Arquivo não encontrado:\n\n{filePath}",
+                    "Arquivo Recente",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                
+                // Remove from recent files
+                _appSettings.RecentFiles.Remove(filePath);
+                _appSettings.Save();
+                PopulateRecentFilesMenu(_menuRecentFiles);
+                return;
+            }
+
+            LoadImageFile(filePath);
+        }
+
+        /// <summary>
+        /// PR13: Clear the recent files list.
+        /// </summary>
+        private void ClearRecentFiles()
+        {
+            _appSettings.RecentFiles.Clear();
+            _appSettings.Save();
+            PopulateRecentFilesMenu(_menuRecentFiles);
+            AppendLog("Lista de arquivos recentes limpa.");
+        }
+
+        /// <summary>
+        /// PR13: Load an image file and add it to recent files.
+        /// </summary>
+        private void LoadImageFile(string filePath)
+        {
+            try
+            {
+                using var bmp = new Bitmap(filePath);
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = (Bitmap)bmp.Clone();
+                _lblStatus.Text = $"Imagem carregada: {Path.GetFileName(filePath)}";
+                AppendLog($"📷 Imagem carregada: {filePath}");
+                
+                // Clear previous analysis
+                _lastScene = null;
+                _lastBaseImageClone?.Dispose();
+                _lastBaseImageClone = (Bitmap)bmp.Clone();
+                SetViewMode(ViewMode.Original);
+                _qualityPanel.ClearChecklist();
+                _txtDetails.Text = "Imagem carregada. Execute uma análise (Analisar) para ver resultados.";
+                UpdateButtonEnabledStates();
+                UpdateStatusInfoBar();
+                
+                // Add to recent files
+                _appSettings.AddRecentFile(filePath);
+                _appSettings.Save();
+                PopulateRecentFilesMenu(_menuRecentFiles);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"❌ Erro ao carregar imagem: {ex.Message}");
+            }
+        }
+
         private void ApplyLocaleTexts()
         {
             if (!_i18n.TryGetValue(_currentLocale, out var t))
@@ -1451,6 +1577,13 @@ namespace HvsMvp.App
                 Multiselect = false
             };
 
+            // PR13: Set initial directory to default images directory if available
+            if (!string.IsNullOrWhiteSpace(_appSettings.DefaultImagesDirectory) &&
+                Directory.Exists(_appSettings.DefaultImagesDirectory))
+            {
+                dlg.InitialDirectory = _appSettings.DefaultImagesDirectory;
+            }
+
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
                 try
@@ -1469,6 +1602,11 @@ namespace HvsMvp.App
                     SetViewMode(ViewMode.Original);
                     ApplyZoom();
                     AppendLog($"Imagem carregada: {Path.GetFileName(dlg.FileName)}");
+                    
+                    // PR13: Add to recent files
+                    _appSettings.AddRecentFile(dlg.FileName);
+                    _appSettings.Save();
+                    PopulateRecentFilesMenu(_menuRecentFiles);
                     
                     // PR9: Update button enabled states
                     UpdateButtonEnabledStates();
