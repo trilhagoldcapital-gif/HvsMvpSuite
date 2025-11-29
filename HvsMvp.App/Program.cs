@@ -24,11 +24,25 @@ namespace HvsMvp.App
         [STAThread]
         static void Main()
         {
+            // PR11: Enhanced startup - always show SOMETHING to the user
+            // Even if everything fails, we must show either the app or an error message
+            
             // PR14: Set up global exception handling for unhandled exceptions
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-            Application.ThreadException += (s, e) => LogStartupError("ThreadException", e.Exception);
+            Application.ThreadException += (s, e) => 
+            {
+                LogStartupError("ThreadException", e.Exception);
+                ShowCriticalError("Erro de thread não tratado", e.Exception);
+            };
             AppDomain.CurrentDomain.UnhandledException += (s, e) => 
-                LogStartupError("UnhandledException", e.ExceptionObject as Exception);
+            {
+                var ex = e.ExceptionObject as Exception;
+                LogStartupError("UnhandledException", ex);
+                if (e.IsTerminating)
+                {
+                    ShowCriticalError("Erro crítico não tratado", ex);
+                }
+            };
 
             try
             {
@@ -39,9 +53,42 @@ namespace HvsMvp.App
             }
             catch (Exception ex)
             {
-                // PR14: Ultimate fallback - if everything fails, try to show at least MainForm
+                // PR11: Ultimate fallback - if everything fails, show clear error message
                 LogStartupError("Critical startup error", ex);
-                TryShowMainFormAsFallback(null, "Critical startup error occurred. Starting in safe mode.");
+                ShowCriticalError("Erro crítico ao iniciar o aplicativo", ex);
+            }
+        }
+        
+        /// <summary>
+        /// PR11: Shows a critical error message to the user via MessageBox.
+        /// This is the last resort when the application cannot start normally.
+        /// </summary>
+        /// <param name="title">The error title to display</param>
+        /// <param name="ex">The exception that caused the error, or null</param>
+        /// <remarks>
+        /// If MessageBox itself fails, this method silently fails.
+        /// The error is also logged to the startup log file.
+        /// </remarks>
+        private static void ShowCriticalError(string title, Exception? ex)
+        {
+            try
+            {
+                string message = $"{title}\n\n";
+                if (ex != null)
+                {
+                    message += $"Detalhes: {ex.Message}\n\n";
+                }
+                message += $"O aplicativo será encerrado.\nVerifique o log em:\n{StartupLogPath}";
+                
+                MessageBox.Show(
+                    message,
+                    "HVS-MVP - Erro Crítico",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            catch
+            {
+                // If even MessageBox fails, we can't do anything
             }
         }
 
