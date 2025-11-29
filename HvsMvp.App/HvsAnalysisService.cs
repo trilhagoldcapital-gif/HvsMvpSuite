@@ -540,20 +540,21 @@ namespace HvsMvp.App
         /// - Compara QualityIndex e %Au nas 3 rodadas.
         /// - Se convergir: QualityStatus = "OfficialRechecked".
         /// - Se divergir:  QualityStatus = "ReviewRequired".
+        /// PR16: Updated to accept ROI parameter for consistent sample/background separation.
         /// </summary>
-        public SampleFullAnalysisResult RunWithAutoReanalysis(Bitmap bmp, string? imagePath)
+        public SampleFullAnalysisResult RunWithAutoReanalysis(Bitmap bmp, string? imagePath, RoiDefinition? roi = null)
         {
-            // 1) Primeira análise normal
-            var scene1 = AnalyzeScene(bmp, imagePath);
+            // 1) Primeira análise normal (PR16: pass ROI)
+            var scene1 = AnalyzeScene(bmp, imagePath, roi);
             var r1 = scene1.Summary;
 
             // Se não for "Invalid", não é amostra crítica: retorna direto
             if (!string.Equals(r1.QualityStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
                 return r1;
 
-            // 2) Amostra crítica -> executar mais 2 análises completas na mesma imagem
-            var scene2 = AnalyzeScene(bmp, imagePath);
-            var scene3 = AnalyzeScene(bmp, imagePath);
+            // 2) Amostra crítica -> executar mais 2 análises completas na mesma imagem (PR16: pass ROI)
+            var scene2 = AnalyzeScene(bmp, imagePath, roi);
+            var scene3 = AnalyzeScene(bmp, imagePath, roi);
             var r2 = scene2.Summary;
             var r3 = scene3.Summary;
 
@@ -596,7 +597,10 @@ namespace HvsMvp.App
             return r1;
         }
 
-        public FullSceneAnalysis AnalyzeScene(Bitmap bmp, string? imagePath)
+        /// <summary>
+        /// PR16: Analyze scene with optional ROI support for sample/background separation.
+        /// </summary>
+        public FullSceneAnalysis AnalyzeScene(Bitmap bmp, string? imagePath, RoiDefinition? roi = null)
         {
             using var src24 = Ensure24bpp(bmp);
 
@@ -606,11 +610,20 @@ namespace HvsMvp.App
             int w = src24.Width, h = src24.Height;
             var mask = new SampleMaskClass[w, h];
             long sampleCount = 0;
+            
+            // PR16: Apply ROI to mask - pixels outside ROI are marked as background
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
                     bool isSample = maskNullable[x, y]?.IsSample == true;
+                    
+                    // PR16: If ROI is defined, further restrict sample area to within ROI
+                    if (isSample && roi != null && roi.Shape != RoiShape.None)
+                    {
+                        isSample = roi.Contains(x, y);
+                    }
+                    
                     mask[x, y] = new SampleMaskClass { IsSample = isSample };
                     if (isSample) sampleCount++;
                 }
