@@ -383,14 +383,14 @@ namespace HvsMvp.App
             mainToolbar.Controls.Add(_toolbarRow1);
 
             // PR12: Helper to create toolbar buttons (compact, visible)
-            Button ToolbarBtn(string text, string tooltip, bool highlight = false, bool primary = false)
+            Button ToolbarBtn(string text, string tooltip, bool highlight = false, bool primary = false, int minWidth = 50)
             {
                 var b = new Button
                 {
                     Text = text,
                     AutoSize = true,
-                    MinimumSize = new Size(50, 26),
-                    MaximumSize = new Size(95, 28),
+                    MinimumSize = new Size(minWidth, 26),
+                    MaximumSize = new Size(95, 26),
                     Margin = new Padding(1, 1, 1, 1),
                     Padding = new Padding(3, 0, 3, 0),
                     BackColor = primary ? Color.FromArgb(50, 90, 130) : 
@@ -479,13 +479,11 @@ namespace HvsMvp.App
             _toolbarRow1.Controls.Add(ToolbarSeparator());
             _toolbarRow1.Controls.Add(ToolbarLabel("ZOOM:"));
 
-            _btnZoomIn = ToolbarBtn("🔍+", "Aumentar zoom");
-            _btnZoomIn.MinimumSize = new Size(36, 26);
+            _btnZoomIn = ToolbarBtn("🔍+", "Aumentar zoom", minWidth: 36);
             _btnZoomIn.Click += BtnZoomMais_Click;
             _toolbarRow1.Controls.Add(_btnZoomIn);
 
-            _btnZoomOut = ToolbarBtn("🔍-", "Diminuir zoom");
-            _btnZoomOut.MinimumSize = new Size(36, 26);
+            _btnZoomOut = ToolbarBtn("🔍-", "Diminuir zoom", minWidth: 36);
             _btnZoomOut.Click += BtnZoomMenos_Click;
             _toolbarRow1.Controls.Add(_btnZoomOut);
 
@@ -705,7 +703,8 @@ namespace HvsMvp.App
             _btnQuickAnalyze = _btnAnalyze;
             _btnQuickPdf = _btnPdf;
             
-            // PR12: Quick access bar (for compatibility)
+            // PR12: Quick access bar - kept for potential future use/compatibility
+            // Not currently used but field exists in class definition
             _quickAccessBar = new Panel { Visible = false };
 
             // PR12: Main content area - simple split: top (image+materials) / bottom (log)
