@@ -17,6 +17,10 @@ namespace HvsMvp.App
         private const int ActiveBorderSize = 2;
         private const int NormalBorderSize = 1;
         
+        // Camera constants
+        private const int MaxValidCameraIndex = 7;
+        private const int FrameLogInterval = 10; // Log every N frames for diagnostics
+        
         private HvsConfig? _config;
         private HvsAnalysisService? _analysisService;
         private AppSettings _appSettings = null!;
@@ -160,6 +164,7 @@ namespace HvsMvp.App
         private int _cameraIndex = 1;
         private int _cameraWidth = 1920;
         private int _cameraHeight = 1080;
+        private int _frameLogCounter; // Counter for throttled frame logging
 
         // PR17: Idioma - use centralized LocalizationService
         private string _currentLocale = "pt-BR";
@@ -266,6 +271,16 @@ namespace HvsMvp.App
 
             // Apply settings to camera
             _cameraIndex = _appSettings.DefaultCameraIndex;
+            
+            // Safer default camera index: clamp to valid range [0, MaxValidCameraIndex]
+            // Many systems expose the primary webcam at index 0
+            bool cameraIndexAdjusted = false;
+            if (_cameraIndex < 0 || _cameraIndex > MaxValidCameraIndex)
+            {
+                _cameraIndex = 0;
+                cameraIndexAdjusted = true;
+            }
+            
             _cameraWidth = _appSettings.GetResolutionWidth();
             _cameraHeight = _appSettings.GetResolutionHeight();
 
@@ -277,6 +292,12 @@ namespace HvsMvp.App
             InitializeLayout();
             InitializeCameraEvents();
             PopulateMaterials();
+            
+            // Log camera index adjustment after UI is initialized
+            if (cameraIndexAdjusted)
+            {
+                AppendLog("Índice de câmera inválido nos settings, usando 0.");
+            }
             
             // PR15: Apply operation profile to UI
             ApplyOperationProfile(_appSettings.CurrentProfile);
@@ -834,6 +855,8 @@ namespace HvsMvp.App
 
             // Add ZoomPanControl to image panel
             _imagePanel.Controls.Add(_zoomPanControl);
+            // Z-order: Ensure ZoomPanControl is visible on top, not hidden behind other controls
+            _zoomPanControl.BringToFront();
 
             // PR16: ROI selection overlay (transparent, on top of zoom control)
             _roiOverlay = new RoiSelectionOverlay(_roiService)
@@ -872,6 +895,8 @@ namespace HvsMvp.App
                 Visible = false
             };
             _imagePanel.Controls.Add(_pictureSample);
+            // Z-order: Send legacy PictureBox to back so it can never cover ZoomPanControl
+            _pictureSample.SendToBack();
             _pictureSample.MouseMove += PictureSample_MouseMove;
 
             _rightPanel = new Panel
@@ -1674,6 +1699,14 @@ namespace HvsMvp.App
                 {
                     try
                     {
+                        // Frame diagnostics: Log frame size to confirm frames are arriving (throttled)
+                        _frameLogCounter++;
+                        if (_frameLogCounter >= FrameLogInterval)
+                        {
+                            _frameLogCounter = 0;
+                            AppendLog($"Frame recebido: {frame.Width}x{frame.Height}");
+                        }
+
                         // PR18: Update PictureBox (for analysis compatibility)
                         var oldPicture = _pictureSample.Image;
                         _pictureSample.Image = (Bitmap)frame.Clone();
