@@ -1905,17 +1905,36 @@ namespace HvsMvp.App
             };
             foreach (var p in presets) combo.Items.Add(p);
             string atual = $"{_cameraWidth}x{_cameraHeight}";
-            // Find matching preset
-            int selectedIdx = 3; // Default to Full HD
+            // Find matching preset dynamically - search for Full HD as default
+            const string DefaultResolutionStart = "1920x1080";
+            int selectedIdx = -1;
+            int defaultIdx = -1;
+            
             for (int i = 0; i < combo.Items.Count; i++)
             {
-                if (combo.Items[i]?.ToString()?.StartsWith(atual) == true)
+                string? itemText = combo.Items[i]?.ToString();
+                if (itemText == null) continue;
+                
+                // Check for current resolution match
+                if (itemText.StartsWith(atual))
                 {
                     selectedIdx = i;
-                    break;
+                }
+                
+                // Track default Full HD index as fallback
+                if (itemText.StartsWith(DefaultResolutionStart))
+                {
+                    defaultIdx = i;
                 }
             }
-            combo.SelectedIndex = selectedIdx;
+            
+            // Use found index, or default to Full HD, or first item as last resort
+            if (selectedIdx >= 0)
+                combo.SelectedIndex = selectedIdx;
+            else if (defaultIdx >= 0)
+                combo.SelectedIndex = defaultIdx;
+            else if (combo.Items.Count > 0)
+                combo.SelectedIndex = 0;
             
             // PR14: Add quality tip label
             var lblTip = new Label
@@ -2620,7 +2639,9 @@ namespace HvsMvp.App
                 Bitmap result;
 
                 // Check if we want Au+PGM combined or single target
-                if (targetId == null || string.Equals(targetId, "Au", StringComparison.OrdinalIgnoreCase) && _cbTarget?.SelectedItem?.ToString()?.Contains("PGM") == true)
+                bool useAuPgmCombinedView = ShouldUseAuPgmCombinedView(targetId, _cbTarget?.SelectedItem?.ToString());
+                
+                if (useAuPgmCombinedView)
                 {
                     // Generate Au+PGM combined view if Au+PGM is somehow selected
                     result = _brightPointsMaskService.GenerateAuPgmBrightPoints(baseImg, _lastScene, options);
@@ -2653,6 +2674,24 @@ namespace HvsMvp.App
             {
                 AppendLog($"Erro ao gerar máscara de pontos brilhantes: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// PR14: Helper method to determine if Au+PGM combined view should be used.
+        /// Extracted from BtnBrightPoints_Click for better readability.
+        /// </summary>
+        private static bool ShouldUseAuPgmCombinedView(string? targetId, string? selectedItemText)
+        {
+            // No target selected - show all materials, not Au+PGM specifically
+            if (targetId == null)
+                return false;
+            
+            // Check if the selection contains "PGM" and target is Au
+            bool isAuTarget = string.Equals(targetId, "Au", StringComparison.OrdinalIgnoreCase);
+            bool selectionContainsPgm = !string.IsNullOrWhiteSpace(selectedItemText) && 
+                                        selectedItemText.Contains("PGM", StringComparison.OrdinalIgnoreCase);
+            
+            return isAuTarget && selectionContainsPgm;
         }
 
         // ===== Training Mode =====

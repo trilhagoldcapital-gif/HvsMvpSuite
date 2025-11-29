@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace HvsMvp.App
@@ -206,8 +207,8 @@ namespace HvsMvp.App
                     DrawBrightPoint(g, particle, options, Color.FromArgb(255, 215, 0));
                 }
 
-                // Draw PGM particles (purple color)
-                var pgmIds = new[] { "Pt", "Pd", "Rh", "Ir", "Ru", "Os" };
+                // Draw PGM particles (purple color) - use VisualizationService.PgmMetals for consistency
+                var pgmIds = VisualizationService.PgmMetals.ToArray();
                 var pgmParticles = FilterParticles(scene, pgmIds, options);
                 foreach (var particle in pgmParticles)
                 {
