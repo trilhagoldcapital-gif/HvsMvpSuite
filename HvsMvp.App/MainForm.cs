@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Collections.Generic;
 
@@ -35,6 +36,9 @@ namespace HvsMvp.App
         private Button _btnLanguage = null!;
         private ContextMenuStrip _languageMenu = null!;
         
+        // PR13: Main menu bar for comprehensive functionality access
+        private MenuStrip _mainMenuBar = null!;
+        
         // PR9: Ribbon-style header panels
         private Panel _quickAccessBar = null!;
         private Panel _statusInfoBar = null!;
@@ -50,6 +54,9 @@ namespace HvsMvp.App
         private Panel _logControlPanel = null!;
         private Button _btnClearLog = null!;
         private Button _btnSaveLog = null!;
+        
+        // PR13: Recent files menu
+        private ToolStripMenuItem _menuRecentFiles = null!;
 
         private SplitContainer _mainVerticalSplit = null!;
         private SplitContainer _contentVerticalSplit = null!;
@@ -307,9 +314,12 @@ namespace HvsMvp.App
 
         private void InitializeLayout()
         {
+            // PR13: Add main menu bar for comprehensive functionality access
+            InitializeMainMenu();
+            
             // PR12: Enhanced layout with 3 toolbar rows for complete UI access
-            // Structure: Header (28px) -> Toolbar Row 1 (32px) -> Toolbar Row 2 (32px) -> Toolbar Row 3 (32px) -> Status Bar (22px) -> Content -> Footer (22px)
-            // Total header: 146px - still leaves room for content at 1366x768
+            // Structure: MenuBar (24px) -> Header (28px) -> Toolbar Row 1 (32px) -> Toolbar Row 2 (32px) -> Toolbar Row 3 (32px) -> Status Bar (22px) -> Content -> Footer (22px)
+            // Total header: 170px - still leaves room for content at 1366x768
             
             _topContainer = new Panel
             {
@@ -861,6 +871,11 @@ namespace HvsMvp.App
             _listGems.SelectedIndexChanged += (s, e) =>
                 ShowMaterialDetails(_config?.Materials?.Gemas?.ElementAtOrDefault(_listGems.SelectedIndex));
 
+            // PR13: Add double-click handlers to show detailed material dialogs
+            _listMetals.DoubleClick += ListMetals_DoubleClick;
+            _listCrystals.DoubleClick += ListCrystals_DoubleClick;
+            _listGems.DoubleClick += ListGems_DoubleClick;
+
             // PR12: Log panel with control bar (in bottom panel of main split)
             var logContainer = new Panel
             {
@@ -998,6 +1013,408 @@ namespace HvsMvp.App
                 }
                 catch { } // Ignore layout errors during load
             };
+        }
+
+        /// <summary>
+        /// PR13: Initialize the main menu bar with comprehensive functionality access.
+        /// Provides organized menu access to all features - complementary to toolbar.
+        /// </summary>
+        private void InitializeMainMenu()
+        {
+            _mainMenuBar = new MenuStrip
+            {
+                Dock = DockStyle.Top,
+                BackColor = Color.FromArgb(20, 30, 45),
+                ForeColor = Color.WhiteSmoke,
+                Font = new Font("Segoe UI", 9),
+                Padding = new Padding(4, 2, 0, 2)
+            };
+            _mainMenuBar.Renderer = new DarkMenuRenderer();
+            Controls.Add(_mainMenuBar);
+
+            // ===== ARQUIVO (File) Menu =====
+            var menuArquivo = new ToolStripMenuItem("📁 Arquivo");
+            menuArquivo.DropDownItems.Add(CreateMenuItem("📂 Abrir imagem...", "Ctrl+O", (s, e) => BtnOpenImage_Click(s, e)));
+            
+            // PR13: Add recent files submenu
+            var menuRecentFiles = new ToolStripMenuItem("📋 Arquivos recentes");
+            PopulateRecentFilesMenu(menuRecentFiles);
+            menuArquivo.DropDownItems.Add(menuRecentFiles);
+            // Store reference for updates
+            _menuRecentFiles = menuRecentFiles;
+            
+            menuArquivo.DropDownItems.Add(new ToolStripSeparator());
+            menuArquivo.DropDownItems.Add(CreateMenuItem("💾 Salvar log...", "Ctrl+S", (s, e) => BtnSaveLog_Click(s, e)));
+            menuArquivo.DropDownItems.Add(CreateMenuItem("🗑 Limpar log", null, (s, e) => BtnClearLog_Click(s, e)));
+            menuArquivo.DropDownItems.Add(new ToolStripSeparator());
+            menuArquivo.DropDownItems.Add(CreateMenuItem("⚙️ Configurações...", "Ctrl+,", (s, e) => BtnSettings_Click(s, e)));
+            menuArquivo.DropDownItems.Add(new ToolStripSeparator());
+            menuArquivo.DropDownItems.Add(CreateMenuItem("❌ Sair", "Alt+F4", (s, e) => Close()));
+            _mainMenuBar.Items.Add(menuArquivo);
+
+            // ===== CÂMERA (Camera) Menu =====
+            var menuCamera = new ToolStripMenuItem("🎥 Câmera");
+            menuCamera.DropDownItems.Add(CreateMenuItem("▶️ Iniciar Live", "F5", (s, e) => BtnLive_Click(s, e)));
+            menuCamera.DropDownItems.Add(CreateMenuItem("⏹️ Parar Live", "F6", (s, e) => BtnParar_Click(s, e)));
+            menuCamera.DropDownItems.Add(new ToolStripSeparator());
+            menuCamera.DropDownItems.Add(CreateMenuItem("🎥 Selecionar câmera...", null, (s, e) => BtnSelecionarCamera_Click(s, e)));
+            menuCamera.DropDownItems.Add(CreateMenuItem("📐 Selecionar resolução...", null, (s, e) => BtnSelecionarResolucao_Click(s, e)));
+            menuCamera.DropDownItems.Add(new ToolStripSeparator());
+            menuCamera.DropDownItems.Add(CreateMenuItem("⚪ Balanço de branco", null, (s, e) => BtnBalanco_Click(s, e)));
+            menuCamera.DropDownItems.Add(CreateMenuItem("📸 Calibrar (snapshot)", null, (s, e) => BtnCalibrarAuto_Click(s, e)));
+            _mainMenuBar.Items.Add(menuCamera);
+
+            // ===== ANÁLISE (Analysis) Menu =====
+            var menuAnalise = new ToolStripMenuItem("🧪 Análise");
+            menuAnalise.DropDownItems.Add(CreateMenuItem("🧪 Analisar", "F9", (s, e) => BtnAnalisar_Click(s, e)));
+            menuAnalise.DropDownItems.Add(CreateMenuItem("⚙️ Análise contínua", "Ctrl+F9", (s, e) => BtnContinuous_Click(s, e)));
+            menuAnalise.DropDownItems.Add(CreateMenuItem("⏸️ Parar contínua", null, (s, e) => BtnStopContinuous_Click(s, e)));
+            menuAnalise.DropDownItems.Add(new ToolStripSeparator());
+            menuAnalise.DropDownItems.Add(CreateMenuItem("🎯 Análise seletiva", "F10", (s, e) => BtnSelectiveAnalyze_Click(s, e)));
+            menuAnalise.DropDownItems.Add(new ToolStripSeparator());
+            
+            // Visualization submenu
+            var subVis = new ToolStripMenuItem("👁️ Visualizações");
+            subVis.DropDownItems.Add(CreateMenuItem("🎨 Máscara", null, (s, e) => BtnMascara_Click(s, e)));
+            subVis.DropDownItems.Add(CreateMenuItem("🖼️ Fundo mascarado", null, (s, e) => BtnFundoMasc_Click(s, e)));
+            subVis.DropDownItems.Add(CreateMenuItem("🗺️ Mapa de fases", null, (s, e) => BtnPhaseMap_Click(s, e)));
+            subVis.DropDownItems.Add(CreateMenuItem("🔥 Heatmap do alvo", null, (s, e) => BtnHeatmap_Click(s, e)));
+            menuAnalise.DropDownItems.Add(subVis);
+            
+            menuAnalise.DropDownItems.Add(new ToolStripSeparator());
+            menuAnalise.DropDownItems.Add(CreateMenuItem("🛠️ Debug HVS...", null, (s, e) => BtnDebugHvs_Click(s, e)));
+            _mainMenuBar.Items.Add(menuAnalise);
+
+            // ===== RELATÓRIOS (Reports) Menu =====
+            var menuRelatorios = new ToolStripMenuItem("📄 Relatórios");
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📄 Exportar PDF...", "Ctrl+P", (s, e) => BtnPdf_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📝 Exportar TXT...", "Ctrl+T", (s, e) => BtnTxt_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("💬 Compartilhar WhatsApp", null, (s, e) => BtnWhatsApp_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(new ToolStripSeparator());
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("👁️ Ver último relatório", null, (s, e) => ViewLastReport()));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📂 Abrir pasta de relatórios", null, (s, e) => OpenReportsFolder()));
+            menuRelatorios.DropDownItems.Add(new ToolStripSeparator());
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("{} Exportar JSON", null, (s, e) => BtnJson_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📊 Exportar CSV", null, (s, e) => BtnCsv_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📈 Exportar BI CSV", null, (s, e) => BtnBiCsv_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(new ToolStripSeparator());
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("🤖 Exportar Dataset IA", null, (s, e) => BtnExportIa_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📁 Abrir pasta datasets", null, (s, e) => BtnParticulas_Click(s, e)));
+            _mainMenuBar.Items.Add(menuRelatorios);
+
+            // ===== FERRAMENTAS (Tools) Menu =====
+            var menuFerramentas = new ToolStripMenuItem("🔧 Ferramentas");
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("✅ QA de Partículas...", null, (s, e) => BtnQaPanel_Click(s, e)));
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("🎯 Modo treino", null, (s, e) => BtnTraining_Click(s, e)));
+            menuFerramentas.DropDownItems.Add(new ToolStripSeparator());
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("📏 Ferramenta de escala", null, (s, e) => BtnEscala_Click(s, e)));
+            menuFerramentas.DropDownItems.Add(new ToolStripSeparator());
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("🔍 Zoom +", "Ctrl++", (s, e) => BtnZoomMais_Click(s, e)));
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("🔍 Zoom -", "Ctrl+-", (s, e) => BtnZoomMenos_Click(s, e)));
+            _mainMenuBar.Items.Add(menuFerramentas);
+
+            // ===== AJUDA (Help) Menu =====
+            var menuAjuda = new ToolStripMenuItem("❓ Ajuda");
+            menuAjuda.DropDownItems.Add(CreateMenuItem("ℹ️ Sobre...", "F1", (s, e) => BtnAbout_Click(s, e)));
+            menuAjuda.DropDownItems.Add(new ToolStripSeparator());
+            menuAjuda.DropDownItems.Add(CreateMenuItem("🔄 Verificar atualizações...", null, (s, e) => CheckForUpdatesFromMenu()));
+            _mainMenuBar.Items.Add(menuAjuda);
+
+            // Register keyboard shortcuts
+            KeyPreview = true;
+            KeyDown += MainForm_KeyDown;
+        }
+
+        /// <summary>
+        /// PR13: Create a styled menu item with optional shortcut text.
+        /// </summary>
+        private ToolStripMenuItem CreateMenuItem(string text, string? shortcut, EventHandler onClick)
+        {
+            var item = new ToolStripMenuItem(text);
+            item.Click += onClick;
+            if (!string.IsNullOrEmpty(shortcut))
+            {
+                item.ShortcutKeyDisplayString = shortcut;
+            }
+            return item;
+        }
+
+        /// <summary>
+        /// PR13: Handle keyboard shortcuts for menu items.
+        /// </summary>
+        private void MainForm_KeyDown(object? sender, KeyEventArgs e)
+        {
+            // Handle keyboard shortcuts
+            if (e.Control)
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.O:
+                        BtnOpenImage_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.S:
+                        BtnSaveLog_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.P:
+                        BtnPdf_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.T:
+                        BtnTxt_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.Oemcomma: // Ctrl+,
+                        BtnSettings_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.Oemplus:
+                    case Keys.Add:
+                        BtnZoomMais_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.OemMinus:
+                    case Keys.Subtract:
+                        BtnZoomMenos_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                }
+                
+                // Ctrl+F9 for continuous
+                if (e.KeyCode == Keys.F9)
+                {
+                    BtnContinuous_Click(sender, e);
+                    e.Handled = true;
+                }
+            }
+            else
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.F1:
+                        BtnAbout_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.F5:
+                        BtnLive_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.F6:
+                        BtnParar_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.F9:
+                        BtnAnalisar_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.F10:
+                        BtnSelectiveAnalyze_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// PR13: Menu handler for checking updates - safely wraps async call.
+        /// </summary>
+        private async void CheckForUpdatesFromMenu()
+        {
+            try
+            {
+                await CheckForUpdatesManuallyAsync();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao verificar atualizações: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PR13: Manually check for updates from menu.
+        /// </summary>
+        private async Task CheckForUpdatesManuallyAsync()
+        {
+            try
+            {
+                AppendLog("Verificando atualizações...");
+                var updateService = new UpdateService();
+                var (hasUpdate, latestVersion, errorMessage) = await updateService.CheckForUpdatesAsync();
+
+                _appSettings.LastUpdateCheck = DateTime.Now;
+
+                if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    _appSettings.LastUpdateResult = "Error";
+                    MessageBox.Show(
+                        this,
+                        $"Erro ao verificar atualizações:\n\n{errorMessage}",
+                        "Verificação de Atualizações",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    AppendLog($"Erro ao verificar atualizações: {errorMessage}");
+                }
+                else if (hasUpdate)
+                {
+                    _appSettings.LastUpdateResult = "UpdateAvailable";
+                    _appSettings.LatestVersionFound = latestVersion;
+
+                    var openPage = MessageBox.Show(
+                        this,
+                        $"Nova versão disponível: {latestVersion}\n\nDeseja abrir a página de download?",
+                        "Atualização Disponível",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Information);
+
+                    if (openPage == DialogResult.Yes)
+                    {
+                        updateService.OpenReleasesPage();
+                    }
+                    AppendLog($"Nova versão disponível: {latestVersion}");
+                }
+                else
+                {
+                    _appSettings.LastUpdateResult = "NoUpdate";
+                    MessageBox.Show(
+                        this,
+                        "Você está usando a versão mais recente.",
+                        "Verificação de Atualizações",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    AppendLog("Você está usando a versão mais recente.");
+                }
+
+                _appSettings.Save();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao verificar atualizações: {ex.Message}");
+                MessageBox.Show(
+                    this,
+                    $"Erro ao verificar atualizações:\n\n{ex.Message}",
+                    "Erro",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// PR13: Populate the recent files menu with stored recent files.
+        /// </summary>
+        private void PopulateRecentFilesMenu(ToolStripMenuItem menu)
+        {
+            const int MaxDisplayNameLength = 40;
+            const int TruncatedNameLength = 37;
+            
+            menu.DropDownItems.Clear();
+
+            if (_appSettings.RecentFiles.Count == 0)
+            {
+                var emptyItem = new ToolStripMenuItem("(Nenhum arquivo recente)")
+                {
+                    Enabled = false
+                };
+                menu.DropDownItems.Add(emptyItem);
+                return;
+            }
+
+            int index = 1;
+            foreach (var filePath in _appSettings.RecentFiles)
+            {
+                if (string.IsNullOrWhiteSpace(filePath)) continue;
+                
+                string displayName = Path.GetFileName(filePath);
+                if (displayName.Length > MaxDisplayNameLength)
+                {
+                    displayName = "..." + displayName.Substring(displayName.Length - TruncatedNameLength);
+                }
+                
+                string menuText = $"{index}. {displayName}";
+                var item = new ToolStripMenuItem(menuText);
+                item.ToolTipText = filePath;
+                
+                // Capture the file path for the click handler
+                string capturedPath = filePath;
+                item.Click += (s, e) => OpenRecentFile(capturedPath);
+                
+                menu.DropDownItems.Add(item);
+                index++;
+            }
+
+            menu.DropDownItems.Add(new ToolStripSeparator());
+            var clearItem = new ToolStripMenuItem("🗑 Limpar lista");
+            clearItem.Click += (s, e) => ClearRecentFiles();
+            menu.DropDownItems.Add(clearItem);
+        }
+
+        /// <summary>
+        /// PR13: Open a recent file.
+        /// </summary>
+        private void OpenRecentFile(string filePath)
+        {
+            if (!File.Exists(filePath))
+            {
+                MessageBox.Show(
+                    this,
+                    $"Arquivo não encontrado:\n\n{filePath}",
+                    "Arquivo Recente",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                
+                // Remove from recent files
+                _appSettings.RecentFiles.Remove(filePath);
+                _appSettings.Save();
+                PopulateRecentFilesMenu(_menuRecentFiles);
+                return;
+            }
+
+            LoadImageFile(filePath);
+        }
+
+        /// <summary>
+        /// PR13: Clear the recent files list.
+        /// </summary>
+        private void ClearRecentFiles()
+        {
+            _appSettings.RecentFiles.Clear();
+            _appSettings.Save();
+            PopulateRecentFilesMenu(_menuRecentFiles);
+            AppendLog("Lista de arquivos recentes limpa.");
+        }
+
+        /// <summary>
+        /// PR13: Load an image file and add it to recent files.
+        /// </summary>
+        private void LoadImageFile(string filePath)
+        {
+            try
+            {
+                using var bmp = new Bitmap(filePath);
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = (Bitmap)bmp.Clone();
+                _lblStatus.Text = $"Imagem carregada: {Path.GetFileName(filePath)}";
+                AppendLog($"📷 Imagem carregada: {filePath}");
+                
+                // Clear previous analysis
+                _lastScene = null;
+                _lastBaseImageClone?.Dispose();
+                _lastBaseImageClone = (Bitmap)bmp.Clone();
+                SetViewMode(ViewMode.Original);
+                _qualityPanel.ClearChecklist();
+                _txtDetails.Text = "Imagem carregada. Execute uma análise (Analisar) para ver resultados.";
+                UpdateButtonEnabledStates();
+                UpdateStatusInfoBar();
+                
+                // Add to recent files
+                _appSettings.AddRecentFile(filePath);
+                _appSettings.Save();
+                PopulateRecentFilesMenu(_menuRecentFiles);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"❌ Erro ao carregar imagem: {ex.Message}");
+            }
         }
 
         private void ApplyLocaleTexts()
@@ -1178,6 +1595,13 @@ namespace HvsMvp.App
                 Multiselect = false
             };
 
+            // PR13: Set initial directory to default images directory if available
+            if (!string.IsNullOrWhiteSpace(_appSettings.DefaultImagesDirectory) &&
+                Directory.Exists(_appSettings.DefaultImagesDirectory))
+            {
+                dlg.InitialDirectory = _appSettings.DefaultImagesDirectory;
+            }
+
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
                 try
@@ -1196,6 +1620,11 @@ namespace HvsMvp.App
                     SetViewMode(ViewMode.Original);
                     ApplyZoom();
                     AppendLog($"Imagem carregada: {Path.GetFileName(dlg.FileName)}");
+                    
+                    // PR13: Add to recent files
+                    _appSettings.AddRecentFile(dlg.FileName);
+                    _appSettings.Save();
+                    PopulateRecentFilesMenu(_menuRecentFiles);
                     
                     // PR9: Update button enabled states
                     UpdateButtonEnabledStates();
@@ -2374,6 +2803,76 @@ namespace HvsMvp.App
             }
         }
 
+        /// <summary>
+        /// PR13: View the last exported report in the default application.
+        /// </summary>
+        private void ViewLastReport()
+        {
+            if (string.IsNullOrWhiteSpace(_lastExportedReportPath))
+            {
+                AppendLog("Nenhum relatório exportado ainda. Exporte um laudo PDF ou TXT primeiro.");
+                MessageBox.Show(
+                    this,
+                    "Nenhum relatório exportado ainda.\n\nExporte um laudo PDF ou TXT primeiro.",
+                    "Visualizar Relatório",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!File.Exists(_lastExportedReportPath))
+            {
+                AppendLog($"Arquivo de relatório não encontrado: {_lastExportedReportPath}");
+                MessageBox.Show(
+                    this,
+                    $"Arquivo de relatório não encontrado:\n\n{_lastExportedReportPath}",
+                    "Visualizar Relatório",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _lastExportedReportPath,
+                    UseShellExecute = true
+                });
+                AppendLog($"Abrindo relatório: {_lastExportedReportPath}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao abrir relatório: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PR13: Open the reports folder in file explorer.
+        /// </summary>
+        private void OpenReportsFolder()
+        {
+            try
+            {
+                string reportsDir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
+                    ? _appSettings.ReportsDirectory
+                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports", "reports");
+                
+                Directory.CreateDirectory(reportsDir);
+                
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = reportsDir,
+                    UseShellExecute = true
+                });
+                AppendLog($"Abrindo pasta de relatórios: {reportsDir}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao abrir pasta de relatórios: {ex.Message}");
+            }
+        }
+
         private void BtnQaPanel_Click(object? sender, EventArgs e)
         {
             if (_lastScene?.Summary == null || _lastBaseImageClone == null)
@@ -2782,6 +3281,51 @@ namespace HvsMvp.App
             sb.AppendLine();
 
             _txtDetails.Text = sb.ToString();
+        }
+
+        /// <summary>
+        /// PR13: Show detailed metal dialog on double-click.
+        /// </summary>
+        private void ListMetals_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null) return;
+            
+            int idx = _listMetals.SelectedIndex;
+            if (idx < 0 || idx >= _lastScene.Summary.Metals.Count) return;
+            
+            var metal = _lastScene.Summary.Metals[idx];
+            using var dlg = new MaterialDetailDialog(metal, _lastScene.Summary);
+            dlg.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// PR13: Show detailed crystal dialog on double-click.
+        /// </summary>
+        private void ListCrystals_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null) return;
+            
+            int idx = _listCrystals.SelectedIndex;
+            if (idx < 0 || idx >= _lastScene.Summary.Crystals.Count) return;
+            
+            var crystal = _lastScene.Summary.Crystals[idx];
+            using var dlg = new MaterialDetailDialog(crystal, _lastScene.Summary);
+            dlg.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// PR13: Show detailed gem dialog on double-click.
+        /// </summary>
+        private void ListGems_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null) return;
+            
+            int idx = _listGems.SelectedIndex;
+            if (idx < 0 || idx >= _lastScene.Summary.Gems.Count) return;
+            
+            var gem = _lastScene.Summary.Gems[idx];
+            using var dlg = new MaterialDetailDialog(gem, _lastScene.Summary);
+            dlg.ShowDialog(this);
         }
 
         // PR8: X-ray mode checkbox handler
@@ -3295,5 +3839,85 @@ namespace HvsMvp.App
             // Trigger the live button click
             BtnLive_Click(this, EventArgs.Empty);
         }
+    }
+
+    /// <summary>
+    /// PR13: Custom menu renderer for dark theme styling.
+    /// </summary>
+    internal class DarkMenuRenderer : ToolStripProfessionalRenderer
+    {
+        public DarkMenuRenderer() : base(new DarkMenuColorTable()) { }
+
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            var item = e.Item;
+            var g = e.Graphics;
+            var rect = new Rectangle(Point.Empty, item.Size);
+
+            if (item.Selected || item.Pressed)
+            {
+                using var brush = new SolidBrush(Color.FromArgb(50, 70, 100));
+                g.FillRectangle(brush, rect);
+            }
+            else
+            {
+                using var brush = new SolidBrush(Color.FromArgb(20, 30, 45));
+                g.FillRectangle(brush, rect);
+            }
+        }
+
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {
+            e.TextColor = Color.WhiteSmoke;
+            base.OnRenderItemText(e);
+        }
+
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            var g = e.Graphics;
+            var rect = new Rectangle(Point.Empty, e.Item.Size);
+            int y = rect.Height / 2;
+            using var pen = new Pen(Color.FromArgb(50, 70, 100));
+            g.DrawLine(pen, 25, y, rect.Width - 5, y);
+        }
+
+        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+        {
+            using var brush = new SolidBrush(Color.FromArgb(20, 30, 45));
+            e.Graphics.FillRectangle(brush, e.AffectedBounds);
+        }
+
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
+        {
+            using var brush = new SolidBrush(Color.FromArgb(25, 35, 50));
+            e.Graphics.FillRectangle(brush, e.AffectedBounds);
+        }
+
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+        {
+            using var pen = new Pen(Color.FromArgb(50, 70, 100));
+            var rect = new Rectangle(0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
+            e.Graphics.DrawRectangle(pen, rect);
+        }
+    }
+
+    /// <summary>
+    /// PR13: Custom color table for dark menu theme.
+    /// </summary>
+    internal class DarkMenuColorTable : ProfessionalColorTable
+    {
+        public override Color MenuItemSelected => Color.FromArgb(50, 70, 100);
+        public override Color MenuItemSelectedGradientBegin => Color.FromArgb(50, 70, 100);
+        public override Color MenuItemSelectedGradientEnd => Color.FromArgb(50, 70, 100);
+        public override Color MenuItemBorder => Color.FromArgb(70, 100, 140);
+        public override Color MenuBorder => Color.FromArgb(50, 70, 100);
+        public override Color MenuItemPressedGradientBegin => Color.FromArgb(60, 85, 120);
+        public override Color MenuItemPressedGradientEnd => Color.FromArgb(60, 85, 120);
+        public override Color ImageMarginGradientBegin => Color.FromArgb(25, 35, 50);
+        public override Color ImageMarginGradientMiddle => Color.FromArgb(25, 35, 50);
+        public override Color ImageMarginGradientEnd => Color.FromArgb(25, 35, 50);
+        public override Color ToolStripDropDownBackground => Color.FromArgb(20, 30, 45);
+        public override Color SeparatorDark => Color.FromArgb(50, 70, 100);
+        public override Color SeparatorLight => Color.FromArgb(60, 85, 120);
     }
 }
