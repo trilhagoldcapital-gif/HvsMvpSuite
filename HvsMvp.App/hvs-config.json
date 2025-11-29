@@ -55,41 +55,48 @@
         "optico": {
           "brilho_lustre": "muito alto",
           "cor_hsv_primary": {
-            "h": [40, 65],
-            "s": [0.30, 1.0],
-            "v": [0.45, 1.0]
+            "h": [35, 68],
+            "s": [0.25, 1.0],
+            "v": [0.40, 1.0],
+            "nota": "PR18: Faixa principal expandida para capturar mais variações de ouro"
           },
           "cor_hsv_secondary": {
-            "h": [38, 58],
-            "s": [0.20, 0.40],
-            "v": [0.55, 1.0],
+            "h": [30, 60],
+            "s": [0.18, 0.45],
+            "v": [0.50, 1.0],
             "nota": "Ouro pálido/claro"
           },
           "cor_hsv_tertiary": {
-            "h": [30, 45],
-            "s": [0.35, 1.0],
-            "v": [0.50, 1.0],
+            "h": [25, 50],
+            "s": [0.30, 1.0],
+            "v": [0.45, 1.0],
             "nota": "Ouro alaranjado"
           },
           "cor_hsv_deep": {
-            "h": [35, 55],
-            "s": [0.25, 0.80],
-            "v": [0.35, 0.55],
+            "h": [32, 58],
+            "s": [0.20, 0.85],
+            "v": [0.30, 0.60],
             "nota": "Ouro escuro/profundo"
           },
+          "cor_hsv_yellow": {
+            "h": [50, 72],
+            "s": [0.30, 1.0],
+            "v": [0.50, 1.0],
+            "nota": "PR18: Ouro amarelo brilhante"
+          },
           "fluorescencia_uv": "muito baixa",
-          "discriminacao": "Requer saturação mínima 0.15, tom quente (amarelo/dourado), R+G dominando B",
+          "discriminacao": "Requer saturação mínima 0.12, tom quente (amarelo/dourado), R+G dominando B",
           "rgb_constraints": {
-            "r_plus_g_min_over_b": 15,
-            "r_g_max_diff": 55,
-            "min_r": 100,
-            "min_g": 100
+            "r_plus_g_min_over_b": 12,
+            "r_g_max_diff": 60,
+            "min_r": 90,
+            "min_g": 90
           },
           "caracteristicas_distintivas": [
             "Tom amarelo/dourado característico",
             "Brilho metálico intenso",
             "Não confundir com pirita (mais esverdeada)",
-            "Distingue-se de PGM por ter saturação > 0.15"
+            "Distingue-se de PGM por ter saturação > 0.12"
           ]
         },
         "morfologia": {
@@ -472,9 +479,11 @@
     "gold_detection": {
       "enabled": true,
       "multi_band": true,
-      "confidence_boost_factor": 1.15,
-      "pgm_discrimination_threshold": 0.10,
-      "notes": "PR17: Multi-band gold detection with enhanced Au/PGM discrimination"
+      "confidence_boost_factor": 1.18,
+      "pgm_discrimination_threshold": 0.12,
+      "min_saturation_for_gold": 0.12,
+      "relaxed_brightness_threshold": 0.30,
+      "notes": "PR18: Enhanced multi-band gold detection with relaxed thresholds for better sensitivity"
     }
   },
   "export": {
@@ -487,6 +496,7 @@
     "adaptacao": "Treinar com dados do seu microscópio/câmera para calibrar limiares locais.",
     "pr14": "PR14 adicionou máscaras inteligentes, pontos brilhantes, e ferramentas de suporte automáticas.",
     "pr16": "PR16 refinou discriminação Au/PGM, adicionou controles de imagem, ROI, zoom real, e modo UV.",
-    "pr17": "PR17 reforçou o núcleo analítico com foco em ouro, implementou detecção multi-banda, melhorou discriminação Au/PGM e ativou todos os idiomas."
+    "pr17": "PR17 reforçou o núcleo analítico com foco em ouro, implementou detecção multi-banda, melhorou discriminação Au/PGM e ativou todos os idiomas.",
+    "pr18": "PR18 corrigiu tela preta (Live/Imagem), expandiu faixas HSV do ouro, melhorou sensibilidade de detecção, e completou localização PT-BR."
   }
 }

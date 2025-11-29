@@ -923,14 +923,14 @@ namespace HvsMvp.App
 
             (Panel colPanel, Label header, ListBox list) CreateColumn(string headerText)
             {
-                var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 2, 4, 2) };
+                var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 3, 4, 3) }; // PR18: Slightly more padding
                 var hdr = new Label
                 {
                     Dock = DockStyle.Top,
-                    Height = 18,
+                    Height = 20, // PR18: Taller header for better readability
                     TextAlign = ContentAlignment.MiddleLeft,
                     ForeColor = Color.FromArgb(220, 230, 245),
-                    Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                    Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), // PR18: Slightly larger font
                     Text = headerText
                 };
                 var lb = new ListBox
@@ -939,7 +939,7 @@ namespace HvsMvp.App
                     BackColor = Color.FromArgb(12, 24, 36),
                     ForeColor = Color.WhiteSmoke,
                     BorderStyle = BorderStyle.FixedSingle,
-                    Font = new Font("Segoe UI", 8)
+                    Font = new Font("Segoe UI", 8.5f) // PR18: Slightly larger font
                 };
                 panel.Controls.Add(lb);
                 panel.Controls.Add(hdr);
@@ -1070,9 +1070,9 @@ namespace HvsMvp.App
             _footerPanel = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 22,
+                Height = 24, // PR18: Slightly taller for better readability
                 BackColor = Color.FromArgb(8, 18, 30),
-                Padding = new Padding(8, 2, 8, 2)
+                Padding = new Padding(10, 3, 10, 3)
             };
             Controls.Add(_footerPanel);
 
@@ -1081,7 +1081,8 @@ namespace HvsMvp.App
                 ForeColor = Color.FromArgb(170, 185, 210),
                 Dock = DockStyle.Left,
                 AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 9) // PR18: Explicit font for consistency
             };
             _footerPanel.Controls.Add(_lblStatus);
 
@@ -1101,20 +1102,20 @@ namespace HvsMvp.App
             // PR12: Initialize button enabled states
             UpdateButtonEnabledStates();
             
-            // PR12: Set initial splitter distance after load
+            // PR18: Set initial splitter distance after load with improved proportions
             this.Load += (s, e) =>
             {
                 try
                 {
-                    // Image panel takes ~65% of width
+                    // Image panel takes ~68% of width (more space for image)
                     if (_contentVerticalSplit != null && _contentVerticalSplit.Width > 0)
                     {
-                        _contentVerticalSplit.SplitterDistance = (int)(_contentVerticalSplit.Width * 0.65);
+                        _contentVerticalSplit.SplitterDistance = (int)(_contentVerticalSplit.Width * 0.68);
                     }
-                    // Log panel takes ~20% of height
+                    // Log panel takes ~15% of height (smaller log, more image space)
                     if (_mainVerticalSplit != null && _mainVerticalSplit.Height > 0)
                     {
-                        _mainVerticalSplit.SplitterDistance = (int)(_mainVerticalSplit.Height * 0.80);
+                        _mainVerticalSplit.SplitterDistance = (int)(_mainVerticalSplit.Height * 0.85);
                     }
                 }
                 catch { } // Ignore layout errors during load
@@ -1673,11 +1674,21 @@ namespace HvsMvp.App
                 {
                     try
                     {
+                        // PR18: Clone the frame to keep a copy
+                        var clonedFrame = (Bitmap)frame.Clone();
+                        
+                        // Update hidden PictureBox for compatibility with analysis methods
                         var old = _pictureSample.Image;
-                        _pictureSample.Image = (Bitmap)frame.Clone();
+                        _pictureSample.Image = clonedFrame;
                         old?.Dispose();
 
-                        ApplyZoom();
+                        // PR18: Update ZoomPanControl directly for live display
+                        // Use UpdateImage() instead of Image setter to avoid reset on every frame
+                        if (_zoomPanControl != null)
+                        {
+                            // For live streaming, UpdateImage avoids zoom/pan reset
+                            _zoomPanControl.UpdateImage(clonedFrame);
+                        }
                     }
                     finally
                     {
@@ -1759,6 +1770,9 @@ namespace HvsMvp.App
                     
                     // PR9: Update button enabled states
                     UpdateButtonEnabledStates();
+                    
+                    // PR18: Auto-enable support tools when Image is loaded
+                    EnableSupportToolsOnStart("Imagem");
                 }
                 catch (Exception ex)
                 {
@@ -2998,13 +3012,17 @@ namespace HvsMvp.App
         {
             if (_pictureSample.Image == null) return;
 
-            // PR16: Update ZoomPanControl if available
+            // PR18: Update ZoomPanControl for image display
+            // Use Image setter for initial load (triggers fit-to-view)
+            // This is called after loading static images, not during live streaming
             if (_zoomPanControl != null)
             {
-                _zoomPanControl.Image = (Bitmap)_pictureSample.Image;
+                // For static images, set the Image property which triggers ResetView()
+                // This ensures the image is properly fitted to the control
+                _zoomPanControl.Image = (Bitmap)_pictureSample.Image.Clone();
             }
 
-            // Legacy zoom support for compatibility
+            // Legacy zoom support for compatibility (kept for reference)
             var img = _pictureSample.Image;
             int newW = (int)(img.Width * _zoomFactor);
             int newH = (int)(img.Height * _zoomFactor);
@@ -4217,6 +4235,9 @@ namespace HvsMvp.App
                 ApplyZoom();
                 AppendLog($"Imagem carregada: {System.IO.Path.GetFileName(imagePath)}");
                 UpdateButtonEnabledStates();
+                
+                // PR18: Auto-enable support tools when Image is loaded from welcome
+                EnableSupportToolsOnStart("Imagem");
             }
             catch (Exception ex)
             {

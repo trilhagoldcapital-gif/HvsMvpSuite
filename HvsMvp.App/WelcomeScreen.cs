@@ -64,7 +64,9 @@ namespace HvsMvp.App
             Size = new Size(900, 620);
             BackColor = _bgColor;
             DoubleBuffered = true;
-            Opacity = 0;
+            
+            // PR18: Start with low opacity for fade-in effect, but not completely invisible
+            Opacity = 0.1;
 
             InitializeParticles();
             InitializeLayout();
@@ -73,8 +75,8 @@ namespace HvsMvp.App
             _particleTimer = new System.Windows.Forms.Timer { Interval = 33 }; // ~30fps
             _particleTimer.Tick += ParticleTimer_Tick;
 
-            // Fade animation timer
-            _fadeTimer = new System.Windows.Forms.Timer { Interval = 16 };
+            // Fade animation timer - PR18: Faster fade-in
+            _fadeTimer = new System.Windows.Forms.Timer { Interval = 10 };
             _fadeTimer.Tick += FadeTimer_Tick;
 
             // Start animations when form loads
@@ -83,9 +85,8 @@ namespace HvsMvp.App
                 _particleTimer.Start();
                 _fadeTimer.Start();
                 
-                // PR15: Safety fallback - ensure form becomes visible after 1 second
-                // even if fade animation fails
-                var visibilityTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+                // PR18: Faster safety fallback - ensure form becomes visible after 500ms
+                var visibilityTimer = new System.Windows.Forms.Timer { Interval = 500 };
                 visibilityTimer.Tick += (ts, te) =>
                 {
                     visibilityTimer.Stop();
@@ -548,7 +549,8 @@ namespace HvsMvp.App
         {
             if (_fadingIn)
             {
-                _opacity += 0.08f;
+                // PR18: Faster fade-in (from ~0.08 to ~0.12 per tick)
+                _opacity += 0.12f;
                 if (_opacity >= 1f)
                 {
                     _opacity = 1f;
@@ -559,7 +561,8 @@ namespace HvsMvp.App
             }
             else if (_fadingOut)
             {
-                _opacity -= 0.1f;
+                // PR18: Faster fade-out
+                _opacity -= 0.15f;
                 if (_opacity <= 0f)
                 {
                     _opacity = 0f;
