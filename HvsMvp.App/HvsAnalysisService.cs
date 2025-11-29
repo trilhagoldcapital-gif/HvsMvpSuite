@@ -144,21 +144,25 @@ namespace HvsMvp.App
         };
         private const double MinMaterialPercentageThreshold = 0.0001; // 0.01%
         
-        // PR17: Enhanced confidence thresholds for gold-focused analysis
-        private const double HighConfidenceThreshold = 0.72;   // PR17: Slightly relaxed for more Au detection
-        private const double MediumConfidenceThreshold = 0.52; // PR17: Adjusted
-        private const double LowConfidenceThreshold = 0.38;    // PR17: Adjusted
-        private const double IndeterminateThreshold = 0.28;    // PR17: Adjusted
+        // PR18: Confidence thresholds adjusted for better gold detection sensitivity
+        // These values were carefully calibrated based on user feedback:
+        // - Lower thresholds increase sensitivity (fewer false negatives)
+        // - Higher gold boost factor compensates for specificity
+        // - Users can fine-tune via MetalConfidenceThreshold in app settings
+        private const double HighConfidenceThreshold = 0.68;   // PR18: Relaxed for more Au detection
+        private const double MediumConfidenceThreshold = 0.48; // PR18: Adjusted
+        private const double LowConfidenceThreshold = 0.35;    // PR18: Adjusted
+        private const double IndeterminateThreshold = 0.25;    // PR18: Adjusted
         
-        // PR17: Minimum gap between best and second-best for high confidence
-        private const double MinScoreGapForHighConfidence = 0.12;   // PR17: Relaxed to detect more gold
-        private const double MinScoreGapForMediumConfidence = 0.06; // PR17: Adjusted
+        // PR18: Reduced minimum gap for more detections
+        private const double MinScoreGapForHighConfidence = 0.10;   // PR18: Relaxed
+        private const double MinScoreGapForMediumConfidence = 0.05; // PR18: Adjusted
         
-        // PR17: Gold-specific confidence boost when multiple conditions match
-        private const double GoldConfidenceBoostFactor = 1.15;
+        // PR18: Increased gold-specific confidence boost
+        private const double GoldConfidenceBoostFactor = 1.18;
         
-        // PR17: PGM vs Gold discrimination threshold
-        private const double PgmVsGoldMinSaturationGap = 0.10;
+        // PR18: PGM vs Gold discrimination threshold - stricter to avoid Au->PGM confusion
+        private const double PgmVsGoldMinSaturationGap = 0.12;
 
         public HvsAnalysisService(HvsConfig config)
         {
@@ -175,39 +179,47 @@ namespace HvsMvp.App
             var ranges = new List<MaterialHsvRange>();
 
             // ====== METAIS ======
-            // PR17: Enhanced gold detection with multiple sub-ranges for different gold appearances
+            // PR18: Enhanced gold detection with expanded sub-ranges for different gold appearances
             
             // Au (Ouro) Primary - Classic yellow gold (most common)
-            // PR17: Primary gold band - rich yellow/golden, HIGHEST priority
+            // PR18: Primary gold band - rich yellow/golden, HIGHEST priority - expanded range
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
-                HMin = 40, HMax = 65, SMin = 0.30, SMax = 1.0, VMin = 0.45, VMax = 1.0,
+                HMin = 35, HMax = 68, SMin = 0.25, SMax = 1.0, VMin = 0.40, VMax = 1.0,
                 Priority = 1.0
             });
             
-            // PR17: Au Secondary - Pale/light gold (lower saturation gold)
+            // PR18: Au Secondary - Pale/light gold (lower saturation gold) - expanded
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
-                HMin = 38, HMax = 58, SMin = 0.20, SMax = 0.40, VMin = 0.55, VMax = 1.0,
+                HMin = 32, HMax = 62, SMin = 0.15, SMax = 0.45, VMin = 0.50, VMax = 1.0,
                 Priority = 0.95
             });
             
-            // PR17: Au Tertiary - Orange-gold (warmer gold tones)
+            // PR18: Au Tertiary - Orange-gold (warmer gold tones) - expanded
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
-                HMin = 30, HMax = 45, SMin = 0.35, SMax = 1.0, VMin = 0.50, VMax = 1.0,
+                HMin = 25, HMax = 48, SMin = 0.30, SMax = 1.0, VMin = 0.45, VMax = 1.0,
                 Priority = 0.92
             });
             
-            // PR17: Au Deep - Deep/dark gold (less bright)
+            // PR18: Au Deep - Deep/dark gold (less bright) - expanded
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
-                HMin = 35, HMax = 55, SMin = 0.25, SMax = 0.80, VMin = 0.35, VMax = 0.55,
+                HMin = 30, HMax = 60, SMin = 0.20, SMax = 0.85, VMin = 0.28, VMax = 0.58,
                 Priority = 0.88
+            });
+            
+            // PR18: Au Yellow Bright - Bright yellow gold
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
+                HMin = 50, HMax = 75, SMin = 0.28, SMax = 1.0, VMin = 0.50, VMax = 1.0,
+                Priority = 0.86
             });
 
             // Ag (Prata) - branco prateado muito brilhante - MUST be VERY bright and low saturation
@@ -576,28 +588,29 @@ namespace HvsMvp.App
         }
         
         /// <summary>
-        /// PR17: Evaluate if pixel has strong gold characteristics.
+        /// PR18: Evaluate if pixel has strong gold characteristics.
         /// Returns true if the pixel has characteristics consistent with gold.
+        /// Relaxed thresholds for better sensitivity.
         /// </summary>
         private bool EvaluateGoldCharacteristics(byte R, byte G, byte B, double H, double S, double V)
         {
-            // Gold characteristics:
-            // 1. Warm hue (yellow/gold range)
-            bool warmHue = H >= 28 && H <= 72;
+            // Gold characteristics - PR18: Relaxed thresholds
+            // 1. Warm hue (yellow/gold range) - expanded
+            bool warmHue = H >= 22 && H <= 78;
             
-            // 2. Some saturation (not gray)
-            bool hasSaturation = S >= 0.15;
+            // 2. Some saturation (not gray) - relaxed
+            bool hasSaturation = S >= 0.12;
             
-            // 3. R and G dominant over B
+            // 3. R and G dominant over B - relaxed
             double avgRG = (R + G) / 2.0;
-            bool rgDominant = avgRG > B + 15;
+            bool rgDominant = avgRG > B + 10;
             
-            // 4. R and G should be similar (yellow, not orange or green)
+            // 4. R and G should be similar (yellow, not orange or green) - relaxed
             double diffRG = Math.Abs(R - G);
-            bool balancedRG = diffRG < 50;
+            bool balancedRG = diffRG < 60;
             
-            // 5. Minimum brightness
-            bool bright = V >= 0.35 && (R >= 100 || G >= 100);
+            // 5. Minimum brightness - relaxed
+            bool bright = V >= 0.28 && (R >= 85 || G >= 85);
             
             // Count how many characteristics match
             int matches = 0;
@@ -607,12 +620,13 @@ namespace HvsMvp.App
             if (balancedRG) matches++;
             if (bright) matches++;
             
-            // At least 4 of 5 characteristics must match
-            return matches >= 4;
+            // PR18: At least 3 of 5 characteristics must match (relaxed from 4)
+            return matches >= 3;
         }
         
         /// <summary>
-        /// PR17: Enhanced gold score evaluation with multi-band support.
+        /// PR18: Enhanced gold score evaluation with multi-band support.
+        /// Relaxed thresholds for better gold sensitivity.
         /// </summary>
         private double EvaluateGoldScore(byte R, byte G, byte B, double H, double S, double V, double baseScore)
         {
@@ -621,72 +635,72 @@ namespace HvsMvp.App
             // Basic gold requirements
             double avgRG = (R + G) / 2.0;
             
-            // PR17: R+G must dominate B (gold is yellow, not blue)
-            if (avgRG <= B + 15)
+            // PR18: R+G must dominate B (gold is yellow, not blue) - relaxed penalties
+            if (avgRG <= B + 10)
             {
-                score *= 0.12;
+                score *= 0.15;
             }
-            else if (avgRG <= B + 35)
+            else if (avgRG <= B + 25)
             {
-                score *= 0.40;
+                score *= 0.45;
             }
             else
             {
                 // Good R+G dominance - slight boost
                 double dominance = (avgRG - B) / 100.0;
-                score *= Math.Min(1.15, 1.0 + dominance * 0.15);
+                score *= Math.Min(1.18, 1.0 + dominance * 0.18);
             }
             
-            // PR17: R and G must be similar (gold is yellow, not orange)
+            // PR18: R and G must be similar (gold is yellow, not orange) - relaxed
             double diffRG = Math.Abs(R - G);
-            if (diffRG > 55)
+            if (diffRG > 65)
             {
-                score *= 0.30;
+                score *= 0.35;
             }
-            else if (diffRG > 35)
+            else if (diffRG > 45)
             {
-                score *= 0.60;
+                score *= 0.65;
             }
-            else if (diffRG < 20)
+            else if (diffRG < 25)
             {
                 // Very balanced - slight boost
-                score *= 1.05;
-            }
-            
-            // PR17: Minimum brightness for gold detection (relaxed)
-            if (R < 100 && G < 100)
-            {
-                score *= 0.30;
-            }
-            else if (R < 120 && G < 120)
-            {
-                score *= 0.55;
-            }
-            
-            // PR17: Gold should have some color saturation (not gray)
-            if (S < 0.15)
-            {
-                score *= 0.20;
-            }
-            else if (S < 0.22)
-            {
-                score *= 0.50;
-            }
-            else if (S >= 0.30 && S <= 0.80)
-            {
-                // Good saturation range for gold - boost
                 score *= 1.08;
             }
             
-            // PR17: Gold has warm hue in yellow range
-            if (H < 25 || H > 78)
+            // PR18: Minimum brightness for gold detection - relaxed
+            if (R < 85 && G < 85)
+            {
+                score *= 0.35;
+            }
+            else if (R < 100 && G < 100)
+            {
+                score *= 0.60;
+            }
+            
+            // PR18: Gold should have some color saturation (not gray) - relaxed
+            if (S < 0.12)
             {
                 score *= 0.25;
             }
-            else if (H >= 38 && H <= 62)
+            else if (S < 0.18)
+            {
+                score *= 0.55;
+            }
+            else if (S >= 0.25 && S <= 0.85)
+            {
+                // Good saturation range for gold - boost
+                score *= 1.10;
+            }
+            
+            // PR18: Gold has warm hue in yellow range - expanded
+            if (H < 20 || H > 82)
+            {
+                score *= 0.28;
+            }
+            else if (H >= 32 && H <= 68)
             {
                 // Optimal gold hue range - boost
-                score *= 1.10;
+                score *= 1.12;
             }
             
             return score;

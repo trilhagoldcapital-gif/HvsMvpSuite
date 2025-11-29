@@ -132,6 +132,7 @@ namespace HvsMvp.App
                 ["title.analysis"] = "Análise de Metais",
                 ["title.settings"] = "Configurações",
                 ["title.about"] = "Sobre",
+                ["title.welcome"] = "Bem-vindo",
                 
                 // Material categories
                 ["metals"] = "Metais",
@@ -146,6 +147,8 @@ namespace HvsMvp.App
                 ["status.live.off"] = "Câmera parada",
                 ["status.continuous"] = "Análise contínua ativa",
                 ["status.error"] = "Erro: {0}",
+                ["status.image.loaded"] = "Imagem carregada",
+                ["status.frame.frozen"] = "Frame congelado",
                 
                 // Main buttons
                 ["btn.open"] = "📂 Abrir imagem",
@@ -205,12 +208,20 @@ namespace HvsMvp.App
                 ["label.report"] = "LAUDO:",
                 ["label.utils"] = "UTIL:",
                 ["label.system"] = "SIS:",
+                ["label.log"] = "📋 Log / Console",
+                ["label.origin"] = "ORIGEM:",
+                ["label.mode"] = "MODO:",
+                ["label.focus"] = "FOCO:",
+                ["label.mask.status"] = "MÁSCARA:",
                 
                 // Analysis results
                 ["result.gold"] = "Ouro (Au)",
                 ["result.platinum"] = "Platina (Pt)",
                 ["result.silver"] = "Prata (Ag)",
                 ["result.copper"] = "Cobre (Cu)",
+                ["result.iron"] = "Ferro (Fe)",
+                ["result.palladium"] = "Paládio (Pd)",
+                ["result.rhodium"] = "Ródio (Rh)",
                 ["result.indeterminate"] = "Indeterminado",
                 ["result.confidence.high"] = "Alta confiança",
                 ["result.confidence.medium"] = "Média confiança",
@@ -222,6 +233,9 @@ namespace HvsMvp.App
                 ["quality.preliminary"] = "Preliminar",
                 ["quality.invalid"] = "Inválido",
                 ["quality.review"] = "Requer revisão",
+                ["quality.ok"] = "OK",
+                ["quality.attention"] = "Atenção",
+                ["quality.bad"] = "Ruim",
                 
                 // Messages
                 ["msg.no.image"] = "Nenhuma imagem carregada",
@@ -231,15 +245,65 @@ namespace HvsMvp.App
                 ["msg.analysis.complete"] = "Análise completa - {0} metais, {1} cristais, {2} gemas",
                 ["msg.export.success"] = "Exportado com sucesso: {0}",
                 ["msg.export.error"] = "Erro ao exportar: {0}",
+                ["msg.live.started"] = "Live iniciado - câmera {0}, {1}x{2}",
+                ["msg.live.stopped"] = "Live parado - Frame congelado para análise",
+                ["msg.image.loaded"] = "Imagem carregada: {0}",
+                ["msg.tools.enabled"] = "Ferramentas de suporte ativadas. Pronto para análise.",
+                ["msg.checklist.ok"] = "Checklist pré-operação: todos os itens OK.",
                 
                 // Menu items
                 ["menu.file"] = "📁 Arquivo",
+                ["menu.file.open"] = "📂 Abrir imagem...",
+                ["menu.file.recent"] = "📋 Arquivos recentes",
+                ["menu.file.save.log"] = "💾 Salvar log...",
+                ["menu.file.clear.log"] = "🗑 Limpar log",
+                ["menu.file.settings"] = "⚙️ Configurações...",
+                ["menu.file.exit"] = "❌ Sair",
                 ["menu.camera"] = "🎥 Câmera",
+                ["menu.camera.start"] = "▶️ Iniciar Live",
+                ["menu.camera.stop"] = "⏹️ Parar Live",
+                ["menu.camera.select"] = "🎥 Selecionar câmera...",
+                ["menu.camera.resolution"] = "📐 Selecionar resolução...",
+                ["menu.camera.wb"] = "⚪ Balanço de branco",
+                ["menu.camera.calibrate"] = "📸 Calibrar (snapshot)",
                 ["menu.analysis"] = "🧪 Análise",
+                ["menu.analysis.run"] = "🧪 Analisar",
+                ["menu.analysis.continuous"] = "⚙️ Análise contínua",
+                ["menu.analysis.stop.continuous"] = "⏸️ Parar contínua",
+                ["menu.analysis.selective"] = "🎯 Análise seletiva",
+                ["menu.analysis.visualizations"] = "👁️ Visualizações",
+                ["menu.analysis.mask"] = "🎨 Máscara",
+                ["menu.analysis.background"] = "🖼️ Fundo mascarado",
+                ["menu.analysis.phase.map"] = "🗺️ Mapa de fases",
+                ["menu.analysis.heatmap"] = "🔥 Heatmap do alvo",
+                ["menu.analysis.debug"] = "🛠️ Debug HVS...",
                 ["menu.reports"] = "📄 Relatórios",
+                ["menu.reports.pdf"] = "📄 Exportar PDF...",
+                ["menu.reports.txt"] = "📝 Exportar TXT...",
+                ["menu.reports.whatsapp"] = "💬 Compartilhar WhatsApp",
+                ["menu.reports.view.last"] = "👁️ Ver último relatório",
+                ["menu.reports.open.folder"] = "📂 Abrir pasta de relatórios",
+                ["menu.reports.json"] = "{} Exportar JSON",
+                ["menu.reports.csv"] = "📊 Exportar CSV",
+                ["menu.reports.bi.csv"] = "📈 Exportar BI CSV",
+                ["menu.reports.ia.dataset"] = "🤖 Exportar Dataset IA",
+                ["menu.reports.open.datasets"] = "📁 Abrir pasta datasets",
                 ["menu.wizards"] = "🧙 Assistentes",
+                ["menu.wizards.gold"] = "🥇 Análise de Ouro (Au) com Live",
+                ["menu.wizards.image"] = "📷 Análise de Imagem com Laudo",
+                ["menu.wizards.checklist"] = "📋 Verificar Checklist de Sistema",
                 ["menu.tools"] = "🔧 Ferramentas",
+                ["menu.tools.qa"] = "✅ QA de Partículas...",
+                ["menu.tools.training"] = "🎯 Modo treino",
+                ["menu.tools.scale"] = "📏 Ferramenta de escala",
+                ["menu.tools.zoom.in"] = "🔍 Zoom +",
+                ["menu.tools.zoom.out"] = "🔍 Zoom -",
+                ["menu.tools.export.config"] = "💾 Exportar configurações...",
+                ["menu.tools.import.config"] = "📥 Importar configurações...",
+                ["menu.tools.export.logs"] = "📋 Exportar logs de sessão...",
                 ["menu.help"] = "❓ Ajuda",
+                ["menu.help.about"] = "ℹ️ Sobre...",
+                ["menu.help.updates"] = "🔄 Verificar atualizações...",
                 
                 // Wizard labels
                 ["wizard.gold.title"] = "Assistente: Análise de Ouro (Au)",
@@ -251,10 +315,10 @@ namespace HvsMvp.App
                 // Confidence indicators
                 ["confidence.indicator"] = "Indicador de Confiança",
                 ["confidence.very.high"] = "Muito alta (> 85%)",
-                ["confidence.high"] = "Alta (72-85%)",
-                ["confidence.medium"] = "Média (52-72%)",
-                ["confidence.low"] = "Baixa (38-52%)",
-                ["confidence.indeterminate"] = "Indeterminado (< 38%)",
+                ["confidence.high"] = "Alta (68-85%)",
+                ["confidence.medium"] = "Média (48-68%)",
+                ["confidence.low"] = "Baixa (35-48%)",
+                ["confidence.indeterminate"] = "Indeterminado (< 35%)",
                 
                 // Report labels
                 ["report.gold.indicator"] = "🥇 INDICADOR DE OURO (Au)",
@@ -275,7 +339,47 @@ namespace HvsMvp.App
                 ["report.confidence.high"] = "Alta",
                 ["report.confidence.medium"] = "Média",
                 ["report.confidence.low"] = "Baixa",
-                ["report.confidence.indet"] = "Indet."
+                ["report.confidence.indet"] = "Indet.",
+                
+                // Dialog buttons
+                ["dialog.ok"] = "OK",
+                ["dialog.cancel"] = "Cancelar",
+                ["dialog.yes"] = "Sim",
+                ["dialog.no"] = "Não",
+                ["dialog.save"] = "Salvar",
+                ["dialog.open"] = "Abrir",
+                ["dialog.close"] = "Fechar",
+                
+                // Welcome screen
+                ["welcome.title"] = "TGC Metal Analítico – HVS-MVP",
+                ["welcome.subtitle"] = "HVS · IA · Microscopia Metalúrgica · Laudos Automatizados",
+                ["welcome.new.image"] = "Nova análise de imagem",
+                ["welcome.new.image.desc"] = "Carregar imagem de amostra para análise detalhada",
+                ["welcome.live"] = "Análise ao vivo",
+                ["welcome.live.desc"] = "Iniciar captura com análise em tempo real (câmera)",
+                ["welcome.explore"] = "Explorar amostras",
+                ["welcome.explore.desc"] = "Abrir pasta de amostras, laudos e exports",
+                ["welcome.skip.checkbox"] = "Não mostrar ao iniciar (modo operador)",
+                ["welcome.go.direct"] = "Ir direto para a interface principal",
+                ["welcome.initial.settings"] = "Configurações iniciais",
+                ["welcome.status.ready"] = "Sistema pronto",
+                ["welcome.status.check"] = "Verificar configuração",
+                
+                // Settings form
+                ["settings.title"] = "Configurações",
+                ["settings.general"] = "Geral",
+                ["settings.camera"] = "Câmera",
+                ["settings.analysis"] = "Análise",
+                ["settings.reports"] = "Relatórios",
+                ["settings.updates"] = "Atualizações",
+                ["settings.interface"] = "Interface",
+                ["settings.profile"] = "Perfil",
+                
+                // Error messages
+                ["error.camera.not.found"] = "Câmera não encontrada",
+                ["error.image.load.failed"] = "Erro ao carregar imagem",
+                ["error.analysis.failed"] = "Erro na análise",
+                ["error.export.failed"] = "Erro ao exportar"
             };
         }
         
