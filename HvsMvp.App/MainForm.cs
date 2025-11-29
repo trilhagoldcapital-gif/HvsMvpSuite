@@ -91,6 +91,7 @@ namespace HvsMvp.App
         private Button _btnMaskBg = null!;
         private Button _btnPhaseMap = null!;   // NEW: Phase map visualization
         private Button _btnHeatmap = null!;     // NEW: Target heatmap
+        private Button _btnBrightPoints = null!; // PR14: Bright points mask
         private Button _btnTraining = null!;    // NEW: Training mode toggle
         private Button _btnAi = null!;
         private Button _btnZoomIn = null!;
@@ -118,6 +119,9 @@ namespace HvsMvp.App
         private ReportService? _reportService;
         private BiExportService? _biExportService;
         private IaDatasetService? _iaDatasetService;
+        
+        // PR14: Intelligent bright points mask service
+        private BrightPointsMaskService _brightPointsMaskService = new BrightPointsMaskService();
 
         // Quality checklist panel
         private QualityChecklistPanel _qualityPanel = null!;
@@ -536,6 +540,11 @@ namespace HvsMvp.App
             _btnHeatmap = ToolbarBtn("🔥 Heat", "Heatmap do alvo");
             _btnHeatmap.Click += BtnHeatmap_Click;
             _toolbarRow2.Controls.Add(_btnHeatmap);
+
+            // PR14: Bright points mask button
+            _btnBrightPoints = ToolbarBtn("✨ Brilho", "Máscara inteligente pontos brilhantes");
+            _btnBrightPoints.Click += BtnBrightPoints_Click;
+            _toolbarRow2.Controls.Add(_btnBrightPoints);
 
             _toolbarRow2.Controls.Add(ToolbarSeparator());
             _toolbarRow2.Controls.Add(ToolbarLabel("SELETIVA:"));
@@ -1410,6 +1419,9 @@ namespace HvsMvp.App
                 _appSettings.AddRecentFile(filePath);
                 _appSettings.Save();
                 PopulateRecentFilesMenu(_menuRecentFiles);
+                
+                // PR14: Auto-enable support tools when Image is loaded
+                EnableSupportToolsOnStart("Imagem");
             }
             catch (Exception ex)
             {
@@ -1775,6 +1787,9 @@ namespace HvsMvp.App
                 _currentImageOrigin = ImageOrigin.CameraLive;
                 _frameFrozen = false;
                 AppendLog($"Live microscópio iniciado – câmera {_cameraIndex}, {_cameraWidth}x{_cameraHeight}.");
+                
+                // PR14: Auto-enable support tools when Live starts
+                EnableSupportToolsOnStart("Live");
             }
             catch (Exception ex)
             {
@@ -1862,7 +1877,7 @@ namespace HvsMvp.App
             {
                 Text = "Selecionar resolução",
                 StartPosition = FormStartPosition.CenterParent,
-                Size = new Size(420, 220),
+                Size = new Size(420, 280),
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false
@@ -1876,26 +1891,81 @@ namespace HvsMvp.App
             var combo = new ComboBox
             {
                 Location = new Point(15, 40),
-                Width = 150,
+                Width = 180,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            string[] presets = new[] { "640x480", "800x600", "1280x720", "1920x1080" };
+            // PR14: Added higher resolution options for better quality
+            string[] presets = new[] { 
+                "640x480", 
+                "800x600", 
+                "1280x720 (HD)", 
+                "1920x1080 (Full HD)", 
+                "2560x1440 (2K QHD)", 
+                "3840x2160 (4K UHD)" 
+            };
             foreach (var p in presets) combo.Items.Add(p);
             string atual = $"{_cameraWidth}x{_cameraHeight}";
-            if (combo.Items.Contains(atual)) combo.SelectedItem = atual; else combo.SelectedIndex = 3;
+            // Find matching preset dynamically - search for Full HD as default
+            const string DefaultResolutionStart = "1920x1080";
+            int selectedIdx = -1;
+            int defaultIdx = -1;
+            
+            for (int i = 0; i < combo.Items.Count; i++)
+            {
+                string? itemText = combo.Items[i]?.ToString();
+                if (itemText == null) continue;
+                
+                // Check for current resolution match
+                if (itemText.StartsWith(atual))
+                {
+                    selectedIdx = i;
+                }
+                
+                // Track default Full HD index as fallback
+                if (itemText.StartsWith(DefaultResolutionStart))
+                {
+                    defaultIdx = i;
+                }
+            }
+            
+            // Use found index, or default to Full HD, or first item as last resort
+            if (selectedIdx >= 0)
+                combo.SelectedIndex = selectedIdx;
+            else if (defaultIdx >= 0)
+                combo.SelectedIndex = defaultIdx;
+            else if (combo.Items.Count > 0)
+                combo.SelectedIndex = 0;
+            
+            // PR14: Add quality tip label
+            var lblTip = new Label
+            {
+                Text = "💡 Dica: Para melhor qualidade de análise,\n" +
+                       "use Full HD (1920x1080) ou superior.\n" +
+                       "Resoluções maiores podem impactar performance.",
+                AutoSize = true,
+                Location = new Point(15, 75),
+                ForeColor = Color.DimGray
+            };
 
-            var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(220, 150), Width = 70 };
-            var btnCancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Location = new Point(300, 150), Width = 70 };
-            form.Controls.Add(lbl); form.Controls.Add(combo); form.Controls.Add(btnOk); form.Controls.Add(btnCancel);
+            var btnOk = new Button { Text = "OK", DialogResult = DialogResult.OK, Location = new Point(220, 200), Width = 70 };
+            var btnCancel = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Location = new Point(300, 200), Width = 70 };
+            form.Controls.Add(lbl); form.Controls.Add(combo); form.Controls.Add(lblTip);
+            form.Controls.Add(btnOk); form.Controls.Add(btnCancel);
             form.AcceptButton = btnOk; form.CancelButton = btnCancel;
 
             if (form.ShowDialog(this) == DialogResult.OK && combo.SelectedItem is string sel)
             {
-                var parts = sel.Split('x');
+                // Extract resolution from format "1920x1080 (Full HD)"
+                var resOnly = sel.Split(' ')[0];
+                var parts = resOnly.Split('x');
                 if (parts.Length == 2 && int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var h))
                 {
                     _cameraWidth = w; _cameraHeight = h;
                     AppendLog($"Resolução selecionada: {_cameraWidth}x{_cameraHeight}");
+                    
+                    // PR14: Update settings
+                    _appSettings.PreferredResolution = $"{w}x{h}";
+                    _appSettings.Save();
                 }
             }
         }
@@ -2520,6 +2590,108 @@ namespace HvsMvp.App
             {
                 AppendLog($"Erro ao gerar heatmap: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// PR14: Bright points mask - intelligent selective visualization with glowing points.
+        /// Shows particle centroids as bright glowing dots with material-specific colors.
+        /// </summary>
+        private void BtnBrightPoints_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_lastScene == null || _lastBaseImageClone == null)
+                {
+                    AppendLog("Nenhuma análise disponível. Execute uma análise primeiro.");
+                    return;
+                }
+
+                // Get selected target from combo (null = all materials)
+                string? targetId = null;
+                string targetName = "Todos";
+                if (_cbTarget?.SelectedItem != null)
+                {
+                    string sel = _cbTarget.SelectedItem.ToString() ?? "";
+                    if (sel.Contains(":") && !sel.Contains("Todos"))
+                    {
+                        var parts = sel.Split(':');
+                        if (parts.Length > 1)
+                        {
+                            targetName = parts[1].Trim();
+                            targetId = ExtractMaterialIdFromName(targetName);
+                        }
+                    }
+                }
+
+                // Create options for bright points visualization
+                var options = new BrightPointsOptions
+                {
+                    PointRadius = 5,
+                    GlowRadius = 14,
+                    MinConfidence = 0.5,
+                    MinParticlePixels = 15,
+                    DimBackground = _chkXrayMode?.Checked == true,
+                    BackgroundDimOpacity = 0.35,
+                    ShowLabels = false
+                };
+
+                using var baseImg = new Bitmap(_lastBaseImageClone);
+                Bitmap result;
+
+                // Check if we want Au+PGM combined or single target
+                bool useAuPgmCombinedView = ShouldUseAuPgmCombinedView(targetId, _cbTarget?.SelectedItem?.ToString());
+                
+                if (useAuPgmCombinedView)
+                {
+                    // Generate Au+PGM combined view if Au+PGM is somehow selected
+                    result = _brightPointsMaskService.GenerateAuPgmBrightPoints(baseImg, _lastScene, options);
+                    AppendLog($"✨ Máscara inteligente gerada: Au + PGM (pontos brilhantes)");
+                }
+                else if (targetId != null)
+                {
+                    // Single target
+                    result = _brightPointsMaskService.GenerateBrightPointsOverlay(
+                        baseImg, _lastScene, new[] { targetId }, options);
+                    AppendLog($"✨ Máscara inteligente gerada: {targetName} (pontos brilhantes)");
+                }
+                else
+                {
+                    // All materials with labels
+                    options.ShowLabels = true;
+                    result = _brightPointsMaskService.GenerateLabeledParticleOverlay(baseImg, _lastScene, options);
+                    AppendLog($"✨ Máscara inteligente gerada: Todos os materiais (pontos brilhantes)");
+                }
+
+                _pictureSample.Image?.Dispose();
+                _pictureSample.Image = result;
+
+                _currentTargetMaterial = targetName;
+                SetViewMode(ViewMode.SeletivaAlvo, $"{targetName} (Brilho)");
+                _zoomFactor = 1.0f;
+                ApplyZoom();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao gerar máscara de pontos brilhantes: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PR14: Helper method to determine if Au+PGM combined view should be used.
+        /// Extracted from BtnBrightPoints_Click for better readability.
+        /// </summary>
+        private static bool ShouldUseAuPgmCombinedView(string? targetId, string? selectedItemText)
+        {
+            // No target selected - show all materials, not Au+PGM specifically
+            if (targetId == null)
+                return false;
+            
+            // Check if the selection contains "PGM" and target is Au
+            bool isAuTarget = string.Equals(targetId, "Au", StringComparison.OrdinalIgnoreCase);
+            bool selectionContainsPgm = !string.IsNullOrWhiteSpace(selectedItemText) && 
+                                        selectedItemText.Contains("PGM", StringComparison.OrdinalIgnoreCase);
+            
+            return isAuTarget && selectionContainsPgm;
         }
 
         // ===== Training Mode =====
@@ -3794,6 +3966,71 @@ namespace HvsMvp.App
             catch
             {
                 // Silent fail on startup update check
+            }
+        }
+
+        /// <summary>
+        /// PR14: Auto-enable support tools when Live or Image mode starts.
+        /// This ensures the user has confidence that "everything is on and analyzing"
+        /// without needing to manually enable options.
+        /// </summary>
+        private void EnableSupportToolsOnStart(string mode)
+        {
+            try
+            {
+                // Log to user that support tools are being enabled
+                AppendLog($"🔧 Ativando ferramentas de suporte automaticamente ({mode})...");
+
+                // Enable X-ray mode for better visualization by default (optional - user preference)
+                // Note: We do NOT auto-check this as it changes the visual drastically
+                // But we ensure the checkbox is responsive
+                if (_chkXrayMode != null)
+                {
+                    _chkXrayMode.Enabled = true;
+                }
+
+                // Enable uncertainty visualization checkbox
+                if (_chkShowUncertainty != null)
+                {
+                    _chkShowUncertainty.Enabled = true;
+                }
+
+                // Set default target to Au (gold) for selective analysis
+                if (_cbTarget != null && _cbTarget.Items.Count > 0)
+                {
+                    // Try to select Au as default
+                    for (int i = 0; i < _cbTarget.Items.Count; i++)
+                    {
+                        string item = _cbTarget.Items[i]?.ToString() ?? "";
+                        if (item.Contains("Au") || item.Contains("Ouro"))
+                        {
+                            _cbTarget.SelectedIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    // If no Au found, select first item
+                    if (_cbTarget.SelectedIndex < 0 && _cbTarget.Items.Count > 0)
+                    {
+                        _cbTarget.SelectedIndex = 0;
+                    }
+                }
+
+                // Ensure quality panel is visible and ready
+                if (_qualityPanel != null)
+                {
+                    _qualityPanel.ClearChecklist();
+                }
+
+                // Update button enabled states
+                UpdateButtonEnabledStates();
+
+                // Log confirmation
+                AppendLog($"✅ Ferramentas de suporte ativadas. Pronto para análise.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"⚠️ Erro ao ativar ferramentas de suporte: {ex.Message}");
             }
         }
 

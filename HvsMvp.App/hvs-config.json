@@ -378,6 +378,46 @@
       {"metric": "exposure_clipping_pct", "max": 2.5}
     ]
   },
+  "visualization": {
+    "bright_points": {
+      "enabled": true,
+      "point_radius": 5,
+      "glow_radius": 14,
+      "min_confidence": 0.5,
+      "min_particle_pixels": 15,
+      "dim_background": true,
+      "background_dim_opacity": 0.35,
+      "show_labels": false
+    },
+    "material_colors": {
+      "Au": "#FFD700",
+      "Ag": "#C0C0C0",
+      "Pt": "#9464A8",
+      "Pd": "#A08CB4",
+      "Rh": "#C8C8DC",
+      "Ir": "#828296",
+      "Ru": "#8C8C8C",
+      "Os": "#64647A",
+      "Cu": "#B87333",
+      "Fe": "#8B4513",
+      "SiO2": "#00C8FF",
+      "C": "#FFFFFF",
+      "Al2O3_blue": "#1E64C8",
+      "Al2O3_red": "#C81E32"
+    },
+    "selective_modes": {
+      "xray_darken_factor": 0.4,
+      "high_confidence_alpha": 0.85,
+      "low_confidence_alpha": 0.45
+    }
+  },
+  "analysis": {
+    "auto_enable_support_tools": true,
+    "default_target": "Au",
+    "priority_metals": ["Au", "Pt", "Pd", "Ag"],
+    "min_particle_size": 20,
+    "confidence_threshold": 0.5
+  },
   "export": {
     "formats": ["JSON", "CSV", "PNG", "TXT"],
     "include": ["features", "probabilidades", "diagnosticos"]
@@ -385,6 +425,7 @@
   "notes": {
     "robustez": "Parâmetros são faixas e heurísticas prontas para ajuste fino via IA.",
     "seguranca": "Evitar limpeza química agressiva; preferir ajustes ópticos para mitigar interferências.",
-    "adaptacao": "Treinar com dados do seu microscópio/câmera para calibrar limiares locais."
+    "adaptacao": "Treinar com dados do seu microscópio/câmera para calibrar limiares locais.",
+    "pr14": "PR14 adicionou máscaras inteligentes, pontos brilhantes, e ferramentas de suporte automáticas."
   }
 }
