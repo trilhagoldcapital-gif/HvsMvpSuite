@@ -204,6 +204,59 @@ namespace HvsMvp.App
         }
         
         /// <summary>
+        /// PR16: Performs additional checks for ROI/image settings before analysis.
+        /// </summary>
+        public ChecklistResult CheckWithPr16Features(bool hasImage, string? imagePath, bool hasRoi, bool uvModeActive, double zoomLevel)
+        {
+            // Start with basic analysis checks
+            var result = CheckBeforeAnalysis(hasImage, imagePath);
+            
+            // PR16 Check: ROI defined
+            var roiCheck = new ChecklistItem
+            {
+                Id = "roi_defined",
+                Name = "ROI definida",
+                Description = hasRoi ? "Área de amostra delimitada" : "Usando imagem completa",
+                IsOk = true, // ROI is optional
+                IsRequired = false
+            };
+            if (!hasRoi)
+            {
+                roiCheck.Description = "⚠ Sem ROI: analisando imagem completa (fundo pode ser incluído)";
+            }
+            result.Items.Add(roiCheck);
+            
+            // PR16 Check: UV mode
+            var uvCheck = new ChecklistItem
+            {
+                Id = "uv_mode",
+                Name = "Modo UV",
+                Description = uvModeActive ? "UV ativo (ajustes aplicados)" : "Luz visível (normal)",
+                IsOk = true, // UV is informational only
+                IsRequired = false
+            };
+            result.Items.Add(uvCheck);
+            
+            // PR16 Check: Zoom level
+            var zoomCheck = new ChecklistItem
+            {
+                Id = "zoom_level",
+                Name = "Nível de zoom",
+                Description = $"Zoom: {(int)(zoomLevel * 100)}%",
+                IsOk = true, // Zoom is informational only
+                IsRequired = false
+            };
+            if (zoomLevel < 0.5 || zoomLevel > 4.0)
+            {
+                zoomCheck.Description += " (fora do intervalo recomendado 50%-400%)";
+            }
+            result.Items.Add(zoomCheck);
+            
+            result.CalculateOverallStatus();
+            return result;
+        }
+        
+        /// <summary>
         /// Shows the checklist dialog and returns whether the user wants to proceed.
         /// </summary>
         public bool ShowChecklistDialog(IWin32Window owner, ChecklistResult result, string operationName)

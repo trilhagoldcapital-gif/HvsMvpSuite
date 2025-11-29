@@ -71,6 +71,63 @@ namespace HvsMvp.App
         /// </summary>
         public bool EnableSessionLogging { get; set; } = true;
 
+        // ===== PR16: New Settings =====
+
+        /// <summary>
+        /// PR16: Current image preset for brightness/contrast/etc.
+        /// </summary>
+        public string ImagePreset { get; set; } = "Standard";
+
+        /// <summary>
+        /// PR16: Custom brightness value (-1.0 to 1.0).
+        /// </summary>
+        public double CustomBrightness { get; set; } = 0;
+
+        /// <summary>
+        /// PR16: Custom contrast value (-1.0 to 1.0).
+        /// </summary>
+        public double CustomContrast { get; set; } = 0;
+
+        /// <summary>
+        /// PR16: Custom gamma value (0.1 to 3.0).
+        /// </summary>
+        public double CustomGamma { get; set; } = 1.0;
+
+        /// <summary>
+        /// PR16: Custom saturation value (-1.0 to 1.0).
+        /// </summary>
+        public double CustomSaturation { get; set; } = 0;
+
+        /// <summary>
+        /// PR16: Whether UV mode is enabled by default.
+        /// </summary>
+        public bool UvModeEnabled { get; set; } = false;
+
+        /// <summary>
+        /// PR16: Default UV mode type (when enabled).
+        /// </summary>
+        public string UvModeType { get; set; } = "Simulated";
+
+        /// <summary>
+        /// PR16: Whether to show ROI selection controls.
+        /// </summary>
+        public bool ShowRoiControls { get; set; } = true;
+
+        /// <summary>
+        /// PR16: Whether to auto-apply image adjustments.
+        /// </summary>
+        public bool AutoApplyImageAdjustments { get; set; } = true;
+
+        /// <summary>
+        /// PR16: Default zoom level (1.0 = 100%).
+        /// </summary>
+        public double DefaultZoomLevel { get; set; } = 1.0;
+
+        /// <summary>
+        /// PR16: Confidence threshold for metal detection (higher = stricter).
+        /// </summary>
+        public double MetalConfidenceThreshold { get; set; } = 0.5;
+
         /// <summary>
         /// PR13: Recent files list for quick access to previously analyzed images.
         /// Maximum 10 files stored.
@@ -178,7 +235,19 @@ namespace HvsMvp.App
                 SkipWelcomeScreen = false,
                 CurrentProfile = OperationProfile.Basic,
                 ShowPreOperationChecklist = true,
-                EnableSessionLogging = true
+                EnableSessionLogging = true,
+                // PR16 defaults
+                ImagePreset = "Standard",
+                CustomBrightness = 0,
+                CustomContrast = 0,
+                CustomGamma = 1.0,
+                CustomSaturation = 0,
+                UvModeEnabled = false,
+                UvModeType = "Simulated",
+                ShowRoiControls = true,
+                AutoApplyImageAdjustments = true,
+                DefaultZoomLevel = 1.0,
+                MetalConfidenceThreshold = 0.5
             };
         }
 
@@ -217,6 +286,18 @@ namespace HvsMvp.App
             CurrentProfile = defaults.CurrentProfile;
             ShowPreOperationChecklist = defaults.ShowPreOperationChecklist;
             EnableSessionLogging = defaults.EnableSessionLogging;
+            // PR16 defaults
+            ImagePreset = defaults.ImagePreset;
+            CustomBrightness = defaults.CustomBrightness;
+            CustomContrast = defaults.CustomContrast;
+            CustomGamma = defaults.CustomGamma;
+            CustomSaturation = defaults.CustomSaturation;
+            UvModeEnabled = defaults.UvModeEnabled;
+            UvModeType = defaults.UvModeType;
+            ShowRoiControls = defaults.ShowRoiControls;
+            AutoApplyImageAdjustments = defaults.AutoApplyImageAdjustments;
+            DefaultZoomLevel = defaults.DefaultZoomLevel;
+            MetalConfidenceThreshold = defaults.MetalConfidenceThreshold;
         }
 
         /// <summary>
