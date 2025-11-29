@@ -54,13 +54,48 @@
         "grupo": "Nobre",
         "optico": {
           "brilho_lustre": "muito alto",
-          "cor_hsv": {
-            "h": [35, 70],
-            "s": [0.25, 1.0],
-            "v": [0.40, 1.0]
+          "cor_hsv_primary": {
+            "h": [40, 65],
+            "s": [0.30, 1.0],
+            "v": [0.45, 1.0]
+          },
+          "cor_hsv_secondary": {
+            "h": [38, 58],
+            "s": [0.20, 0.40],
+            "v": [0.55, 1.0],
+            "nota": "Ouro pálido/claro"
+          },
+          "cor_hsv_tertiary": {
+            "h": [30, 45],
+            "s": [0.35, 1.0],
+            "v": [0.50, 1.0],
+            "nota": "Ouro alaranjado"
+          },
+          "cor_hsv_deep": {
+            "h": [35, 55],
+            "s": [0.25, 0.80],
+            "v": [0.35, 0.55],
+            "nota": "Ouro escuro/profundo"
           },
           "fluorescencia_uv": "muito baixa",
-          "discriminacao": "Requer saturação mínima 0.25 e tom quente (amarelo/dourado)"
+          "discriminacao": "Requer saturação mínima 0.15, tom quente (amarelo/dourado), R+G dominando B",
+          "rgb_constraints": {
+            "r_plus_g_min_over_b": 15,
+            "r_g_max_diff": 55,
+            "min_r": 100,
+            "min_g": 100
+          },
+          "caracteristicas_distintivas": [
+            "Tom amarelo/dourado característico",
+            "Brilho metálico intenso",
+            "Não confundir com pirita (mais esverdeada)",
+            "Distingue-se de PGM por ter saturação > 0.15"
+          ]
+        },
+        "morfologia": {
+          "formas_tipicas": ["granular", "lamelar", "dendrítico", "pepita"],
+          "tamanho_tipico_um": [5, 5000],
+          "habito_cristalino": "cúbico, octaédrico"
         }
       },
       {
@@ -71,11 +106,11 @@
           "brilho_lustre": "muito alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.10],
+            "s": [0.0, 0.08],
             "v": [0.88, 1.0]
           },
           "fluorescencia_uv": "baixa",
-          "discriminacao": "Muito brilhante (V>0.88) e sem cor (S<0.10)"
+          "discriminacao": "Muito brilhante (V>0.88) e sem cor (S<0.08)"
         }
       },
       {
@@ -86,10 +121,10 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.12],
+            "s": [0.0, 0.10],
             "v": [0.45, 0.82]
           },
-          "discriminacao": "Cinza neutro médio - saturação muito baixa (<0.12)"
+          "discriminacao": "Cinza neutro médio - saturação muito baixa (<0.10). Distingue-se de Au por S < 0.10"
         }
       },
       {
@@ -100,7 +135,7 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.14],
+            "s": [0.0, 0.12],
             "v": [0.50, 0.88]
           },
           "discriminacao": "Similar a Pt mas ligeiramente mais claro"
@@ -114,9 +149,10 @@
           "brilho_lustre": "muito alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.15],
-            "v": [0.50, 0.95]
-          }
+            "s": [0.0, 0.12],
+            "v": [0.55, 0.92]
+          },
+          "discriminacao": "PGM reflexivo, neutro"
         }
       },
       {
@@ -127,9 +163,10 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.18],
-            "v": [0.30, 0.80]
-          }
+            "s": [0.0, 0.15],
+            "v": [0.30, 0.75]
+          },
+          "discriminacao": "PGM mais escuro"
         }
       },
       {
@@ -140,9 +177,10 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.25],
-            "v": [0.30, 0.75]
-          }
+            "s": [0.0, 0.20],
+            "v": [0.30, 0.70]
+          },
+          "discriminacao": "PGM cinza escuro"
         }
       },
       {
@@ -153,9 +191,10 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.20],
-            "v": [0.25, 0.75]
-          }
+            "s": [0.0, 0.18],
+            "v": [0.25, 0.70]
+          },
+          "discriminacao": "PGM mais escuro do grupo"
         }
       },
       {
@@ -165,10 +204,11 @@
         "optico": {
           "brilho_lustre": "alto",
           "cor_hsv": {
-            "h": [15, 25],
-            "s": [0.5, 0.9],
-            "v": [0.5, 0.95]
-          }
+            "h": [8, 28],
+            "s": [0.50, 0.95],
+            "v": [0.45, 0.92]
+          },
+          "discriminacao": "Cor avermelhada/alaranjada distintiva (H < 30)"
         }
       },
       {
@@ -422,12 +462,19 @@
     "min_particle_size": 20,
     "confidence_threshold": 0.5,
     "confidence_levels": {
-      "high_threshold": 0.75,
-      "medium_threshold": 0.55,
-      "low_threshold": 0.40,
-      "indeterminate_threshold": 0.30,
-      "min_score_gap_high": 0.15,
-      "min_score_gap_medium": 0.08
+      "high_threshold": 0.72,
+      "medium_threshold": 0.52,
+      "low_threshold": 0.38,
+      "indeterminate_threshold": 0.28,
+      "min_score_gap_high": 0.12,
+      "min_score_gap_medium": 0.06
+    },
+    "gold_detection": {
+      "enabled": true,
+      "multi_band": true,
+      "confidence_boost_factor": 1.15,
+      "pgm_discrimination_threshold": 0.10,
+      "notes": "PR17: Multi-band gold detection with enhanced Au/PGM discrimination"
     }
   },
   "export": {
@@ -439,6 +486,7 @@
     "seguranca": "Evitar limpeza química agressiva; preferir ajustes ópticos para mitigar interferências.",
     "adaptacao": "Treinar com dados do seu microscópio/câmera para calibrar limiares locais.",
     "pr14": "PR14 adicionou máscaras inteligentes, pontos brilhantes, e ferramentas de suporte automáticas.",
-    "pr16": "PR16 refinou discriminação Au/PGM, adicionou controles de imagem, ROI, zoom real, e modo UV."
+    "pr16": "PR16 refinou discriminação Au/PGM, adicionou controles de imagem, ROI, zoom real, e modo UV.",
+    "pr17": "PR17 reforçou o núcleo analítico com foco em ouro, implementou detecção multi-banda, melhorou discriminação Au/PGM e ativou todos os idiomas."
   }
 }

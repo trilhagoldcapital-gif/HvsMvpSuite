@@ -100,8 +100,38 @@ namespace HvsMvp.App
             sb.AppendLine("  METAIS DETECTADOS");
             sb.AppendLine("───────────────────────────────────────────────────────────────────");
             sb.AppendLine();
-            sb.AppendLine("  Metal           | Score   | % Amostra | PPM        | Grupo");
-            sb.AppendLine("  ────────────────┼─────────┼───────────┼────────────┼──────────");
+            
+            // PR17: Add special gold confidence indicator section
+            var goldResult = result.Metals.Find(m => m.Id == "Au");
+            if (goldResult != null)
+            {
+                string goldConfidence = GetGoldConfidenceIndicator(goldResult);
+                sb.AppendLine($"  🥇 INDICADOR DE OURO (Au)");
+                sb.AppendLine($"     Score: {goldResult.Score:F3} | Confiança: {goldConfidence}");
+                sb.AppendLine($"     Fração: {goldResult.PctSample:P4} | PPM: {goldResult.PpmEstimated?.ToString("F0") ?? "-"}");
+                
+                // Add detailed confidence message
+                if (goldResult.Score >= 0.72)
+                {
+                    sb.AppendLine("     ✅ Detecção de ALTA CONFIANÇA - Ouro identificado com segurança");
+                }
+                else if (goldResult.Score >= 0.52)
+                {
+                    sb.AppendLine("     ⚠️ Detecção de MÉDIA CONFIANÇA - Provável ouro, confirmar com análise adicional");
+                }
+                else if (goldResult.Score >= 0.38)
+                {
+                    sb.AppendLine("     ⚠️ Detecção de BAIXA CONFIANÇA - Possível ouro, recomenda-se verificação");
+                }
+                else
+                {
+                    sb.AppendLine("     ❌ Detecção INDETERMINADA - Não foi possível confirmar ouro nesta análise");
+                }
+                sb.AppendLine();
+            }
+            
+            sb.AppendLine("  Metal           | Score   | Confiança | % Amostra | PPM        | Grupo");
+            sb.AppendLine("  ────────────────┼─────────┼───────────┼───────────┼────────────┼──────────");
             
             foreach (var m in result.Metals)
             {
@@ -109,10 +139,11 @@ namespace HvsMvp.App
                 {
                     string name = (m.Name ?? m.Id).PadRight(14);
                     string score = m.Score.ToString("F3").PadLeft(7);
+                    string confidence = GetConfidenceLevel(m.Score).PadLeft(9);
                     string pct = m.PctSample.ToString("P4").PadLeft(9);
                     string ppm = (m.PpmEstimated?.ToString("F0") ?? "-").PadLeft(10);
                     string group = (m.Group ?? "-").PadRight(8);
-                    sb.AppendLine($"  {name} | {score} | {pct} | {ppm} | {group}");
+                    sb.AppendLine($"  {name} | {score} | {confidence} | {pct} | {ppm} | {group}");
                 }
             }
             sb.AppendLine();
@@ -393,6 +424,30 @@ namespace HvsMvp.App
             gfx.DrawString(label, font, XBrushes.Gray, margin, y);
             gfx.DrawString(value, font, XBrushes.Black, margin + 100, y);
             y += 14;
+        }
+        
+        /// <summary>
+        /// PR17: Get confidence level string for a score.
+        /// </summary>
+        private string GetConfidenceLevel(double score)
+        {
+            if (score >= 0.85) return "Muito Alta";
+            if (score >= 0.72) return "Alta";
+            if (score >= 0.52) return "Média";
+            if (score >= 0.38) return "Baixa";
+            return "Indet.";
+        }
+        
+        /// <summary>
+        /// PR17: Get detailed gold confidence indicator.
+        /// </summary>
+        private string GetGoldConfidenceIndicator(MetalResult gold)
+        {
+            if (gold.Score >= 0.85) return "🟢 MUITO ALTA (>85%)";
+            if (gold.Score >= 0.72) return "🟢 ALTA (72-85%)";
+            if (gold.Score >= 0.52) return "🟡 MÉDIA (52-72%)";
+            if (gold.Score >= 0.38) return "🟠 BAIXA (38-52%)";
+            return "🔴 INDETERMINADO (<38%)";
         }
 
         private string GetReportsDirectory()

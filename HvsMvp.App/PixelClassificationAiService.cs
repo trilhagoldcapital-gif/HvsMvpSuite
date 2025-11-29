@@ -79,24 +79,30 @@ namespace HvsMvp.App
 
     /// <summary>
     /// Implementação stub do serviço de classificação IA.
+    /// PR17: Enhanced with better gold detection and Au/PGM discrimination.
     /// Usa os mesmos scorings HVS como base para manter comportamento consistente.
     /// Preparado para substituição por modelo ONNX/ML.NET real no futuro.
     /// </summary>
     public class PixelClassificationAiServiceStub : IPixelClassificationAiService
     {
         public bool IsUsingRealModel => false;
-        public string ModelInfo => "HVS-Heuristic-Stub-v1.0";
+        public string ModelInfo => "HVS-Heuristic-Stub-v1.1-PR17";
 
-        // Material HSV ranges - these should ideally come from configuration
-        // but are kept here for the stub implementation
+        // PR17: Enhanced material HSV ranges with better gold discrimination
         // Format: (hMin, hMax, sMin, sMax, vMin, vMax)
         private static readonly Dictionary<string, (double hMin, double hMax, double sMin, double sMax, double vMin, double vMax)> MaterialRanges =
             new Dictionary<string, (double, double, double, double, double, double)>
             {
-                // Gold: yellow/golden tones
-                ["Au"] = (30, 80, 0.18, 1.0, 0.35, 1.0),
-                // Platinum: gray/neutral tones with low saturation
-                ["Pt"] = (0, 360, 0.0, 0.20, 0.20, 0.92),
+                // PR17: Gold - primary band (classic yellow gold)
+                ["Au"] = (40, 65, 0.30, 1.0, 0.45, 1.0),
+                // PR17: Gold secondary - pale gold
+                ["Au_pale"] = (38, 58, 0.20, 0.40, 0.55, 1.0),
+                // PR17: Gold tertiary - orange-gold
+                ["Au_orange"] = (30, 45, 0.35, 1.0, 0.50, 1.0),
+                // Platinum: gray/neutral tones with VERY low saturation
+                ["Pt"] = (0, 360, 0.0, 0.10, 0.45, 0.82),
+                // Palladium: similar to Pt
+                ["Pd"] = (0, 360, 0.0, 0.12, 0.50, 0.88),
                 // Sulfides: yellow/orange tones
                 ["Sulfeto"] = (20, 60, 0.3, 0.8, 0.2, 0.7),
                 // Silicates: blue/cyan tones

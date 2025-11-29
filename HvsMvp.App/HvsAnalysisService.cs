@@ -144,15 +144,21 @@ namespace HvsMvp.App
         };
         private const double MinMaterialPercentageThreshold = 0.0001; // 0.01%
         
-        // PR16: Confidence thresholds for better discrimination
-        private const double HighConfidenceThreshold = 0.75;
-        private const double MediumConfidenceThreshold = 0.55;
-        private const double LowConfidenceThreshold = 0.40;
-        private const double IndeterminateThreshold = 0.30;
+        // PR17: Enhanced confidence thresholds for gold-focused analysis
+        private const double HighConfidenceThreshold = 0.72;   // PR17: Slightly relaxed for more Au detection
+        private const double MediumConfidenceThreshold = 0.52; // PR17: Adjusted
+        private const double LowConfidenceThreshold = 0.38;    // PR17: Adjusted
+        private const double IndeterminateThreshold = 0.28;    // PR17: Adjusted
         
-        // PR16: Minimum gap between best and second-best for high confidence
-        private const double MinScoreGapForHighConfidence = 0.15;
-        private const double MinScoreGapForMediumConfidence = 0.08;
+        // PR17: Minimum gap between best and second-best for high confidence
+        private const double MinScoreGapForHighConfidence = 0.12;   // PR17: Relaxed to detect more gold
+        private const double MinScoreGapForMediumConfidence = 0.06; // PR17: Adjusted
+        
+        // PR17: Gold-specific confidence boost when multiple conditions match
+        private const double GoldConfidenceBoostFactor = 1.15;
+        
+        // PR17: PGM vs Gold discrimination threshold
+        private const double PgmVsGoldMinSaturationGap = 0.10;
 
         public HvsAnalysisService(HvsConfig config)
         {
@@ -162,93 +168,151 @@ namespace HvsMvp.App
 
         /// <summary>
         /// Constrói lista de ranges HSV para todos os materiais do catálogo.
-        /// PR16: Refined ranges to minimize overlap and confusion between metals.
+        /// PR17: Enhanced gold detection with multi-band approach and better Au/PGM discrimination.
         /// </summary>
         private List<MaterialHsvRange> BuildMaterialRanges()
         {
             var ranges = new List<MaterialHsvRange>();
 
             // ====== METAIS ======
-            // PR16: Tighter ranges with better separation between Au and other metals
-
-            // Au (Ouro) - dourado/amarelo - REFINED: narrower hue range, higher saturation requirement
+            // PR17: Enhanced gold detection with multiple sub-ranges for different gold appearances
+            
+            // Au (Ouro) Primary - Classic yellow gold (most common)
+            // PR17: Primary gold band - rich yellow/golden, HIGHEST priority
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
-                HMin = 35, HMax = 70, SMin = 0.25, SMax = 1.0, VMin = 0.40, VMax = 1.0,
+                HMin = 40, HMax = 65, SMin = 0.30, SMax = 1.0, VMin = 0.45, VMax = 1.0,
                 Priority = 1.0
+            });
+            
+            // PR17: Au Secondary - Pale/light gold (lower saturation gold)
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
+                HMin = 38, HMax = 58, SMin = 0.20, SMax = 0.40, VMin = 0.55, VMax = 1.0,
+                Priority = 0.95
+            });
+            
+            // PR17: Au Tertiary - Orange-gold (warmer gold tones)
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
+                HMin = 30, HMax = 45, SMin = 0.35, SMax = 1.0, VMin = 0.50, VMax = 1.0,
+                Priority = 0.92
+            });
+            
+            // PR17: Au Deep - Deep/dark gold (less bright)
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
+                HMin = 35, HMax = 55, SMin = 0.25, SMax = 0.80, VMin = 0.35, VMax = 0.55,
+                Priority = 0.88
             });
 
             // Ag (Prata) - branco prateado muito brilhante - MUST be VERY bright and low saturation
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Ag", Name = "Prata", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.10, VMin = 0.88, VMax = 1.0,
-                Priority = 0.95
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.08, VMin = 0.88, VMax = 1.0,
+                Priority = 0.90
             });
 
-            // Pt (Platina) - cinza neutro médio - REFINED: stricter saturation and value range
+            // Pt (Platina) - cinza neutro médio - PR17: stricter saturation to prevent Au confusion
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Pt", Name = "Platina", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.12, VMin = 0.45, VMax = 0.82,
-                Priority = 0.88
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.10, VMin = 0.45, VMax = 0.82,
+                Priority = 0.85
             });
 
-            // Pd (Paládio) - similar a Pt mas um pouco mais claro - REFINED
+            // Pd (Paládio) - similar a Pt mas um pouco mais claro - PR17: stricter saturation
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Pd", Name = "Paládio", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.14, VMin = 0.50, VMax = 0.88,
-                Priority = 0.82
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.12, VMin = 0.50, VMax = 0.88,
+                Priority = 0.80
             });
 
-            // Cu (Cobre) - avermelhado/laranja - REFINED: very specific hue range
+            // PR17: Additional PGM metals with stricter saturation limits
+            // Rh (Ródio) - very reflective, neutral
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Rh", Name = "Ródio", Type = PixelMaterialType.Metal,
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.12, VMin = 0.55, VMax = 0.92,
+                Priority = 0.75
+            });
+            
+            // Ir (Irídio) - darker PGM
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Ir", Name = "Irídio", Type = PixelMaterialType.Metal,
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.15, VMin = 0.30, VMax = 0.75,
+                Priority = 0.72
+            });
+            
+            // Ru (Rutênio) - dark gray PGM
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Ru", Name = "Rutênio", Type = PixelMaterialType.Metal,
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.20, VMin = 0.30, VMax = 0.70,
+                Priority = 0.70
+            });
+            
+            // Os (Ósmio) - darkest PGM
+            ranges.Add(new MaterialHsvRange
+            {
+                Id = "Os", Name = "Ósmio", Type = PixelMaterialType.Metal,
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.18, VMin = 0.25, VMax = 0.70,
+                Priority = 0.68
+            });
+
+            // Cu (Cobre) - avermelhado/laranja - PR17: narrower hue to avoid Au overlap
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Cu", Name = "Cobre", Type = PixelMaterialType.Metal,
-                HMin = 10, HMax = 30, SMin = 0.45, SMax = 0.95, VMin = 0.45, VMax = 0.92,
-                Priority = 0.87
+                HMin = 8, HMax = 28, SMin = 0.50, SMax = 0.95, VMin = 0.45, VMax = 0.92,
+                Priority = 0.84
             });
 
-            // Fe (Ferro) - cinza escuro/marrom - REFINED
+            // Fe (Ferro) - cinza escuro/marrom
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Fe", Name = "Ferro", Type = PixelMaterialType.Metal,
                 HMin = 0, HMax = 25, SMin = 0.0, SMax = 0.35, VMin = 0.18, VMax = 0.55,
-                Priority = 0.72
+                Priority = 0.70
             });
 
-            // Al (Alumínio) - branco/prateado brilhante - REFINED: must be very bright
+            // Al (Alumínio) - branco/prateado brilhante
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Al", Name = "Alumínio", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.12, VMin = 0.78, VMax = 1.0,
-                Priority = 0.76
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.10, VMin = 0.80, VMax = 1.0,
+                Priority = 0.74
             });
 
-            // Ni (Níquel) - cinza médio - REFINED
+            // Ni (Níquel) - cinza médio - PR17: stricter saturation
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Ni", Name = "Níquel", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.20, VMin = 0.52, VMax = 0.82,
-                Priority = 0.72
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.15, VMin = 0.52, VMax = 0.82,
+                Priority = 0.70
             });
 
-            // Zn (Zinco) - cinza claro - REFINED
+            // Zn (Zinco) - cinza claro
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Zn", Name = "Zinco", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.12, VMin = 0.62, VMax = 0.88,
-                Priority = 0.68
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.10, VMin = 0.62, VMax = 0.88,
+                Priority = 0.66
             });
 
-            // Pb (Chumbo) - cinza escuro - REFINED
+            // Pb (Chumbo) - cinza escuro
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Pb", Name = "Chumbo", Type = PixelMaterialType.Metal,
-                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.20, VMin = 0.22, VMax = 0.52,
-                Priority = 0.62
+                HMin = 0, HMax = 360, SMin = 0.0, SMax = 0.18, VMin = 0.22, VMax = 0.52,
+                Priority = 0.60
             });
 
             // ====== CRISTAIS ======
@@ -344,7 +408,7 @@ namespace HvsMvp.App
         /// <summary>
         /// Classifica um pixel baseado em HSV e RGB.
         /// Retorna o material mais provável e sua confiança.
-        /// PR16: Enhanced with confidence levels and better Au vs PGM discrimination.
+        /// PR17: Enhanced gold detection with multi-band approach and robust Au/PGM discrimination.
         /// </summary>
         private PixelClassificationResult ClassifyPixel(byte R, byte G, byte B, double H, double S, double V)
         {
@@ -355,8 +419,15 @@ namespace HvsMvp.App
             string secondBestMaterial = "Unknown";
             double secondBestScore = 0;
 
-            // PR16: Track scores for all candidates to determine confidence
+            // PR17: Track Au-specific scores across all Au bands
+            double maxAuScore = 0;
+            bool hasGoldCharacteristics = false;
+
+            // PR17: Track scores for all candidates to determine confidence
             var candidateScores = new List<(string Id, PixelMaterialType Type, double Score)>();
+            
+            // PR17: Pre-compute gold characteristics for boosting
+            hasGoldCharacteristics = EvaluateGoldCharacteristics(R, G, B, H, S, V);
 
             foreach (var range in _materialRanges)
             {
@@ -365,80 +436,69 @@ namespace HvsMvp.App
                 // Apply priority as a multiplier
                 score *= range.Priority;
 
-                // PR16: Enhanced RGB-based checks for metals with stricter criteria
+                // PR17: Enhanced RGB-based checks for metals with stricter criteria
                 if (range.Type == PixelMaterialType.Metal)
                 {
-                    // Gold: MUST have R and G dominant over B, with warm yellow/gold appearance
+                    // PR17: Enhanced Gold detection with multi-band support
                     if (range.Id == "Au")
                     {
-                        double avgRG = (R + G) / 2.0;
-                        // PR16: Stricter check - R+G must clearly dominate B
-                        if (avgRG <= B + 20) score *= 0.15;
-                        else if (avgRG <= B + 40) score *= 0.35;
+                        double goldScore = EvaluateGoldScore(R, G, B, H, S, V, score);
+                        score = goldScore;
                         
-                        // R and G must be similar (gold is yellow, not orange)
-                        double diffRG = Math.Abs(R - G);
-                        if (diffRG > 60) score *= 0.3;
-                        else if (diffRG > 40) score *= 0.6;
+                        // Track max Au score across all Au bands
+                        if (score > maxAuScore)
+                        {
+                            maxAuScore = score;
+                        }
                         
-                        // Minimum brightness for gold detection
-                        if (R < 130 && G < 130) score *= 0.25;
-                        else if (R < 100 || G < 100) score *= 0.4;
-                        
-                        // PR16: Gold should NOT be too gray (must have color)
-                        if (S < 0.20) score *= 0.2;
-                        
-                        // PR16: Additional check - gold has warm hue
-                        if (H < 30 || H > 75) score *= 0.3;
+                        // PR17: Boost if pixel has strong gold characteristics
+                        if (hasGoldCharacteristics && score > 0.3)
+                        {
+                            score *= GoldConfidenceBoostFactor;
+                        }
                     }
                     
                     // Copper: R must be significantly higher than G and B (reddish-orange)
                     if (range.Id == "Cu")
                     {
-                        if (R <= G || R <= B) score *= 0.2;
-                        // PR16: Copper is distinctly reddish
-                        if (R < G + 30) score *= 0.4;
-                        if (S < 0.35) score *= 0.3;
+                        score = EvaluateCopperScore(R, G, B, H, S, V, score);
                     }
 
-                    // PGM metals (Pt, Pd): MUST be neutral gray - low saturation, similar RGB
-                    if (range.Id == "Pt" || range.Id == "Pd")
+                    // PR17: All PGM metals - stricter neutrality check
+                    if (range.Id == "Pt" || range.Id == "Pd" || range.Id == "Rh" || 
+                        range.Id == "Ir" || range.Id == "Ru" || range.Id == "Os")
                     {
-                        int max = Math.Max(R, Math.Max(G, B));
-                        int min = Math.Min(R, Math.Min(G, B));
-                        int rgbRange = max - min;
-                        
-                        // PR16: Stricter neutrality check for PGM
-                        if (rgbRange > 25) score *= 0.3;
-                        else if (rgbRange > 15) score *= 0.6;
-                        
-                        // PR16: PGM should NOT have warm yellow tones (distinguish from Au)
-                        if (H >= 30 && H <= 75 && S > 0.15) score *= 0.2;
-                        
-                        // PR16: Must be truly neutral (low saturation)
-                        if (S > 0.15) score *= 0.35;
+                        score = EvaluatePgmScore(R, G, B, H, S, V, score);
                     }
                     
-                    // Other PGM and neutral metals
+                    // Other neutral metals
                     if (range.Id == "Ni" || range.Id == "Zn" || range.Id == "Al")
                     {
                         int max = Math.Max(R, Math.Max(G, B));
                         int min = Math.Min(R, Math.Min(G, B));
                         if (max - min > 30) score *= 0.45;
                         
-                        // PR16: These should not be warm colored
-                        if (H >= 30 && H <= 75 && S > 0.18) score *= 0.3;
+                        // PR17: These should not be warm colored
+                        if (H >= 30 && H <= 70 && S > 0.15) score *= 0.25;
                     }
                     
                     // Silver: MUST be very bright and neutral
                     if (range.Id == "Ag")
                     {
                         if (V < 0.85) score *= 0.3;
-                        if (S > 0.12) score *= 0.4;
+                        if (S > 0.10) score *= 0.35;
                         
                         int max = Math.Max(R, Math.Max(G, B));
                         int min = Math.Min(R, Math.Min(G, B));
-                        if (max - min > 20) score *= 0.4;
+                        if (max - min > 18) score *= 0.35;
+                    }
+                    
+                    // Iron: low brightness, low saturation, can have reddish tones
+                    if (range.Id == "Fe")
+                    {
+                        if (V > 0.60) score *= 0.5;
+                        // Iron should not be bright yellow
+                        if (H >= 35 && H <= 65 && S > 0.25) score *= 0.3;
                     }
                 }
 
@@ -459,10 +519,17 @@ namespace HvsMvp.App
                 }
             }
 
-            // PR16: Calculate score gap for confidence assessment
+            // PR17: Calculate score gap for confidence assessment
             double scoreGap = bestScore - secondBestScore;
+            
+            // PR17: Special handling for gold - apply additional boost if it's clearly gold
+            if (bestMaterial == "Au" && hasGoldCharacteristics && scoreGap > 0.05)
+            {
+                // Boost gold confidence when characteristics match
+                bestScore = Math.Min(0.95, bestScore * 1.05);
+            }
 
-            // PR16: Determine confidence level based on score AND gap
+            // PR17: Determine confidence level based on score AND gap
             ConfidenceLevel confidenceLevel;
             
             if (bestScore >= HighConfidenceThreshold && scoreGap >= MinScoreGapForHighConfidence)
@@ -482,9 +549,9 @@ namespace HvsMvp.App
                 confidenceLevel = ConfidenceLevel.Indeterminate;
             }
 
-            // PR16: If indeterminate, prefer to mark as "Unknown" rather than wrongly classify
+            // PR17: If indeterminate, prefer to mark as "Unknown" rather than wrongly classify
             if (bestScore < IndeterminateThreshold || 
-                (confidenceLevel == ConfidenceLevel.Indeterminate && scoreGap < 0.05))
+                (confidenceLevel == ConfidenceLevel.Indeterminate && scoreGap < 0.04))
             {
                 result.MaterialId = "Indeterminate";
                 result.MaterialType = PixelMaterialType.None;
@@ -506,6 +573,203 @@ namespace HvsMvp.App
             }
 
             return result;
+        }
+        
+        /// <summary>
+        /// PR17: Evaluate if pixel has strong gold characteristics.
+        /// Returns true if the pixel has characteristics consistent with gold.
+        /// </summary>
+        private bool EvaluateGoldCharacteristics(byte R, byte G, byte B, double H, double S, double V)
+        {
+            // Gold characteristics:
+            // 1. Warm hue (yellow/gold range)
+            bool warmHue = H >= 28 && H <= 72;
+            
+            // 2. Some saturation (not gray)
+            bool hasSaturation = S >= 0.15;
+            
+            // 3. R and G dominant over B
+            double avgRG = (R + G) / 2.0;
+            bool rgDominant = avgRG > B + 15;
+            
+            // 4. R and G should be similar (yellow, not orange or green)
+            double diffRG = Math.Abs(R - G);
+            bool balancedRG = diffRG < 50;
+            
+            // 5. Minimum brightness
+            bool bright = V >= 0.35 && (R >= 100 || G >= 100);
+            
+            // Count how many characteristics match
+            int matches = 0;
+            if (warmHue) matches++;
+            if (hasSaturation) matches++;
+            if (rgDominant) matches++;
+            if (balancedRG) matches++;
+            if (bright) matches++;
+            
+            // At least 4 of 5 characteristics must match
+            return matches >= 4;
+        }
+        
+        /// <summary>
+        /// PR17: Enhanced gold score evaluation with multi-band support.
+        /// </summary>
+        private double EvaluateGoldScore(byte R, byte G, byte B, double H, double S, double V, double baseScore)
+        {
+            double score = baseScore;
+            
+            // Basic gold requirements
+            double avgRG = (R + G) / 2.0;
+            
+            // PR17: R+G must dominate B (gold is yellow, not blue)
+            if (avgRG <= B + 15)
+            {
+                score *= 0.12;
+            }
+            else if (avgRG <= B + 35)
+            {
+                score *= 0.40;
+            }
+            else
+            {
+                // Good R+G dominance - slight boost
+                double dominance = (avgRG - B) / 100.0;
+                score *= Math.Min(1.15, 1.0 + dominance * 0.15);
+            }
+            
+            // PR17: R and G must be similar (gold is yellow, not orange)
+            double diffRG = Math.Abs(R - G);
+            if (diffRG > 55)
+            {
+                score *= 0.30;
+            }
+            else if (diffRG > 35)
+            {
+                score *= 0.60;
+            }
+            else if (diffRG < 20)
+            {
+                // Very balanced - slight boost
+                score *= 1.05;
+            }
+            
+            // PR17: Minimum brightness for gold detection (relaxed)
+            if (R < 100 && G < 100)
+            {
+                score *= 0.30;
+            }
+            else if (R < 120 && G < 120)
+            {
+                score *= 0.55;
+            }
+            
+            // PR17: Gold should have some color saturation (not gray)
+            if (S < 0.15)
+            {
+                score *= 0.20;
+            }
+            else if (S < 0.22)
+            {
+                score *= 0.50;
+            }
+            else if (S >= 0.30 && S <= 0.80)
+            {
+                // Good saturation range for gold - boost
+                score *= 1.08;
+            }
+            
+            // PR17: Gold has warm hue in yellow range
+            if (H < 25 || H > 78)
+            {
+                score *= 0.25;
+            }
+            else if (H >= 38 && H <= 62)
+            {
+                // Optimal gold hue range - boost
+                score *= 1.10;
+            }
+            
+            return score;
+        }
+        
+        /// <summary>
+        /// PR17: Enhanced copper score evaluation.
+        /// </summary>
+        private double EvaluateCopperScore(byte R, byte G, byte B, double H, double S, double V, double baseScore)
+        {
+            double score = baseScore;
+            
+            // Copper must be distinctly reddish
+            if (R <= G || R <= B)
+            {
+                score *= 0.15;
+            }
+            else if (R < G + 25)
+            {
+                score *= 0.35;
+            }
+            
+            // Copper requires good saturation
+            if (S < 0.40)
+            {
+                score *= 0.30;
+            }
+            
+            // Copper hue is orange-red (lower than gold)
+            if (H > 32)
+            {
+                score *= 0.50;
+            }
+            
+            return score;
+        }
+        
+        /// <summary>
+        /// PR17: Enhanced PGM (Platinum Group Metals) score evaluation.
+        /// Stricter neutrality check to prevent confusion with gold.
+        /// </summary>
+        private double EvaluatePgmScore(byte R, byte G, byte B, double H, double S, double V, double baseScore)
+        {
+            double score = baseScore;
+            
+            int max = Math.Max(R, Math.Max(G, B));
+            int min = Math.Min(R, Math.Min(G, B));
+            int rgbRange = max - min;
+            
+            // PR17: Stricter neutrality check for PGM
+            if (rgbRange > 22)
+            {
+                score *= 0.25;
+            }
+            else if (rgbRange > 12)
+            {
+                score *= 0.55;
+            }
+            else
+            {
+                // Very neutral - boost
+                score *= 1.08;
+            }
+            
+            // PR17: PGM should NOT have warm yellow tones (distinguish from Au)
+            if (H >= 28 && H <= 72 && S > 0.12)
+            {
+                // This looks like gold territory
+                score *= 0.15;
+            }
+            
+            // PR17: PGM must be truly neutral (low saturation)
+            if (S > 0.12)
+            {
+                score *= 0.30;
+            }
+            else if (S < 0.06)
+            {
+                // Very low saturation - boost for PGM
+                score *= 1.10;
+            }
+            
+            return score;
         }
 
         public (SampleFullAnalysisResult analysis, SampleMaskClass[,] mask, Bitmap maskPreview)

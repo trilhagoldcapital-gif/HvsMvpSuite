@@ -161,46 +161,49 @@ namespace HvsMvp.App
         private int _cameraWidth = 1920;
         private int _cameraHeight = 1080;
 
-        // Idioma
+        // PR17: Idioma - use centralized LocalizationService
         private string _currentLocale = "pt-BR";
-        private readonly Dictionary<string, Dictionary<string, string>> _i18n =
+        
+        // Legacy i18n dictionary for backward compatibility
+        // PR17: This is now backed by LocalizationService for complete translations
+        private Dictionary<string, Dictionary<string, string>> _i18n =>
             new()
             {
                 ["pt-BR"] = new()
                 {
-                    ["title"] = "TGC Metal Analítico · HVS-MVP",
-                    ["metals"] = "Metais",
-                    ["crystals"] = "Cristais",
-                    ["gems"] = "Gemas",
-                    ["status.ready"] = "Pronto · HVS-MVP carregado",
-                    ["btn.open"] = "📂 Abrir imagem",
-                    ["btn.live"] = "▶ Live",
-                    ["btn.stop"] = "⏹ Parar",
-                    ["btn.analyze"] = "🧪 Analisar",
-                    ["btn.cont"] = "⚙ Contínuo",
-                    ["btn.cont.stop"] = "⏸ Parar contínuo",
-                    ["btn.mask"] = "🎨 Máscara",
-                    ["btn.mask.bg"] = "🖼 Fundo mascarado",
-                    ["btn.phase.map"] = "🗺 Mapa de Fases",
-                    ["btn.heatmap"] = "🔥 Heatmap Alvo",
-                    ["btn.training"] = "🎯 Modo Treino",
-                    ["btn.ai"] = "🔬 Partículas / Dataset IA",
-                    ["btn.zoom.in"] = "🔍 Zoom +",
-                    ["btn.zoom.out"] = "🔎 Zoom -",
-                    ["btn.wb"] = "⚪ Balanço de branco",
-                    ["btn.scale"] = "📏 Escala",
-                    ["btn.camera"] = "🎥 Câmera...",
-                    ["btn.res"] = "⚙️ Resolução...",
-                    ["btn.txt"] = "📝 Laudo TXT",
-                    ["btn.pdf"] = "📄 Laudo PDF",
-                    ["btn.json"] = "{} JSON",
-                    ["btn.csv"] = "📊 CSV",
-                    ["btn.bi.csv"] = "📈 BI CSV",
-                    ["btn.export.ia"] = "🤖 Dataset IA",
-                    ["btn.qa.panel"] = "✅ QA Partículas",
-                    ["btn.debug"] = "🛠 Debug HVS",
-                    ["btn.calib"] = "📸 Calibrar (auto)",
-                    ["label.target"] = "Alvo:"
+                    ["title"] = LocalizationService.Instance.Get("title"),
+                    ["metals"] = LocalizationService.Instance.Get("metals"),
+                    ["crystals"] = LocalizationService.Instance.Get("crystals"),
+                    ["gems"] = LocalizationService.Instance.Get("gems"),
+                    ["status.ready"] = LocalizationService.Instance.Get("status.ready"),
+                    ["btn.open"] = LocalizationService.Instance.Get("btn.open"),
+                    ["btn.live"] = LocalizationService.Instance.Get("btn.live"),
+                    ["btn.stop"] = LocalizationService.Instance.Get("btn.stop"),
+                    ["btn.analyze"] = LocalizationService.Instance.Get("btn.analyze"),
+                    ["btn.cont"] = LocalizationService.Instance.Get("btn.cont"),
+                    ["btn.cont.stop"] = LocalizationService.Instance.Get("btn.cont.stop"),
+                    ["btn.mask"] = LocalizationService.Instance.Get("btn.mask"),
+                    ["btn.mask.bg"] = LocalizationService.Instance.Get("btn.mask.bg"),
+                    ["btn.phase.map"] = LocalizationService.Instance.Get("btn.phase.map"),
+                    ["btn.heatmap"] = LocalizationService.Instance.Get("btn.heatmap"),
+                    ["btn.training"] = LocalizationService.Instance.Get("btn.training"),
+                    ["btn.ai"] = LocalizationService.Instance.Get("btn.ai"),
+                    ["btn.zoom.in"] = LocalizationService.Instance.Get("btn.zoom.in"),
+                    ["btn.zoom.out"] = LocalizationService.Instance.Get("btn.zoom.out"),
+                    ["btn.wb"] = LocalizationService.Instance.Get("btn.wb"),
+                    ["btn.scale"] = LocalizationService.Instance.Get("btn.scale"),
+                    ["btn.camera"] = LocalizationService.Instance.Get("btn.camera"),
+                    ["btn.res"] = LocalizationService.Instance.Get("btn.res"),
+                    ["btn.txt"] = LocalizationService.Instance.Get("btn.txt"),
+                    ["btn.pdf"] = LocalizationService.Instance.Get("btn.pdf"),
+                    ["btn.json"] = LocalizationService.Instance.Get("btn.json"),
+                    ["btn.csv"] = LocalizationService.Instance.Get("btn.csv"),
+                    ["btn.bi.csv"] = LocalizationService.Instance.Get("btn.bi.csv"),
+                    ["btn.export.ia"] = LocalizationService.Instance.Get("btn.export.ia"),
+                    ["btn.qa.panel"] = LocalizationService.Instance.Get("btn.qa.panel"),
+                    ["btn.debug"] = LocalizationService.Instance.Get("btn.debug"),
+                    ["btn.calib"] = LocalizationService.Instance.Get("btn.calib"),
+                    ["label.target"] = LocalizationService.Instance.Get("label.target")
                 },
                 ["en-US"] = new()
                 {
@@ -232,11 +235,90 @@ namespace HvsMvp.App
                     ["btn.json"] = "{} JSON",
                     ["btn.csv"] = "📊 CSV",
                     ["btn.bi.csv"] = "📈 BI CSV",
-                    ["btn.export.ia"] = "🤖 IA Dataset",
+                    ["btn.export.ia"] = "🤖 AI Dataset",
                     ["btn.qa.panel"] = "✅ QA Particles",
                     ["btn.debug"] = "🛠 HVS Debug",
                     ["btn.calib"] = "📸 Calibrate (auto)",
                     ["label.target"] = "Target:"
+                },
+                ["es-ES"] = new()
+                {
+                    ["title"] = "TGC Análisis de Metales · HVS-MVP",
+                    ["metals"] = "Metales",
+                    ["crystals"] = "Cristales",
+                    ["gems"] = "Gemas",
+                    ["status.ready"] = "Listo · HVS-MVP cargado",
+                    ["btn.open"] = "📂 Abrir imagen",
+                    ["btn.live"] = "▶ En vivo",
+                    ["btn.stop"] = "⏹ Detener",
+                    ["btn.analyze"] = "🧪 Analizar",
+                    ["btn.cont"] = "⚙ Continuo",
+                    ["btn.cont.stop"] = "⏸ Detener continuo",
+                    ["btn.mask"] = "🎨 Máscara",
+                    ["btn.mask.bg"] = "🖼 Fondo enmascarado",
+                    ["btn.phase.map"] = "🗺 Mapa de Fases",
+                    ["btn.heatmap"] = "🔥 Mapa de calor",
+                    ["btn.training"] = "🎯 Modo Entrenamiento",
+                    ["btn.ai"] = "🔬 Partículas / Dataset IA",
+                    ["btn.zoom.in"] = "🔍 Zoom +",
+                    ["btn.zoom.out"] = "🔎 Zoom -",
+                    ["btn.wb"] = "⚪ Balance de blancos",
+                    ["btn.scale"] = "📏 Escala",
+                    ["btn.camera"] = "🎥 Cámara...",
+                    ["btn.res"] = "⚙️ Resolución...",
+                    ["btn.txt"] = "📝 Informe TXT",
+                    ["btn.pdf"] = "📄 Informe PDF",
+                    ["btn.json"] = "{} JSON",
+                    ["btn.csv"] = "📊 CSV",
+                    ["btn.bi.csv"] = "📈 BI CSV",
+                    ["btn.export.ia"] = "🤖 Dataset IA",
+                    ["btn.qa.panel"] = "✅ QA Partículas",
+                    ["btn.debug"] = "🛠 Debug HVS",
+                    ["btn.calib"] = "📸 Calibrar (auto)",
+                    ["label.target"] = "Objetivo:"
+                },
+                ["fr-FR"] = new()
+                {
+                    ["title"] = "TGC Analyse des Métaux · HVS-MVP",
+                    ["metals"] = "Métaux",
+                    ["crystals"] = "Cristaux",
+                    ["gems"] = "Gemmes",
+                    ["status.ready"] = "Prêt · HVS-MVP chargé",
+                    ["btn.open"] = "📂 Ouvrir image",
+                    ["btn.live"] = "▶ En direct",
+                    ["btn.stop"] = "⏹ Arrêter",
+                    ["btn.analyze"] = "🧪 Analyser",
+                    ["btn.cont"] = "⚙ Continu",
+                    ["btn.cont.stop"] = "⏸ Arrêter continu",
+                    ["btn.mask"] = "🎨 Masque",
+                    ["btn.mask.bg"] = "🖼 Fond masqué",
+                    ["label.target"] = "Cible:"
+                },
+                ["ar"] = new()
+                {
+                    ["title"] = "TGC تحليل المعادن · HVS-MVP",
+                    ["metals"] = "المعادن",
+                    ["crystals"] = "البلورات",
+                    ["gems"] = "الأحجار الكريمة",
+                    ["status.ready"] = "جاهز · HVS-MVP محمل",
+                    ["btn.open"] = "📂 فتح صورة",
+                    ["btn.live"] = "▶ مباشر",
+                    ["btn.stop"] = "⏹ إيقاف",
+                    ["btn.analyze"] = "🧪 تحليل",
+                    ["label.target"] = "الهدف:"
+                },
+                ["zh-CN"] = new()
+                {
+                    ["title"] = "TGC 金属分析 · HVS-MVP",
+                    ["metals"] = "金属",
+                    ["crystals"] = "晶体",
+                    ["gems"] = "宝石",
+                    ["status.ready"] = "就绪 · HVS-MVP 已加载",
+                    ["btn.open"] = "📂 打开图像",
+                    ["btn.live"] = "▶ 实时",
+                    ["btn.stop"] = "⏹ 停止",
+                    ["btn.analyze"] = "🧪 分析",
+                    ["label.target"] = "目标:"
                 }
             };
 
@@ -1733,12 +1815,14 @@ namespace HvsMvp.App
 
         private void SetLanguage(string locale)
         {
-            if (!_i18n.ContainsKey(locale))
+            // PR17: Use LocalizationService for centralized locale management
+            if (!LocalizationService.SupportedLocales.ContainsKey(locale))
                 locale = "pt-BR";
 
             _currentLocale = locale;
+            LocalizationService.Instance.CurrentLocale = locale;
             ApplyLocaleTexts();
-            AppendLog($"Idioma definido: {locale}");
+            AppendLog($"Idioma definido: {locale} ({LocalizationService.SupportedLocales[locale]})");
         }
 
         private void BtnOpenImage_Click(object? sender, EventArgs e)
