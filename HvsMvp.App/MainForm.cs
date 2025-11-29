@@ -1816,8 +1816,18 @@ namespace HvsMvp.App
                 return;
             }
 
+            // PR15: Show pre-operation checklist if enabled
+            if (!ShowLiveChecklist())
+            {
+                AppendLog("Live cancelado - checklist não atendido.");
+                return;
+            }
+
             try
             {
+                // PR15: Start session logging
+                StartLiveSession();
+                
                 _microscopeCamera.DeviceIndex = _cameraIndex;
                 _microscopeCamera.Width = _cameraWidth;
                 _microscopeCamera.Height = _cameraHeight;
@@ -1835,6 +1845,7 @@ namespace HvsMvp.App
             catch (Exception ex)
             {
                 AppendLog($"Erro ao iniciar Live microscópio: {ex.Message}");
+                _sessionLogger?.LogError("Live start failed", ex);
                 _liveRunning = false;
             }
         }
@@ -1855,6 +1866,9 @@ namespace HvsMvp.App
                 // PR8: Frame freezing - maintain last scene for selective analysis
                 _frameFrozen = true;
                 _currentImageOrigin = ImageOrigin.CameraFrozen;
+                
+                // PR15: End session logging for Live
+                _sessionLogger?.EndSession("Live stopped by user");
                 
                 AppendLog("Live microscópio parado – Frame congelado para análise.");
                 
@@ -2031,6 +2045,12 @@ namespace HvsMvp.App
                 {
                     AppendLog("📷 Capturando frame da câmera para análise...");
                 }
+                
+                // PR15: Track analysis timing
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                
+                // PR15: Start analysis session if not already in a Live session
+                StartAnalysisSession();
 
                 using var bmp = new Bitmap(_pictureSample.Image);
 
@@ -2046,6 +2066,10 @@ namespace HvsMvp.App
                 }
 
                 _lastScene = scene;
+                
+                // PR15: Log analysis completion
+                stopwatch.Stop();
+                LogAnalysisCompletion(scene.Summary, stopwatch.ElapsedMilliseconds);
 
                 _lastBaseImageClone?.Dispose();
                 _lastBaseImageClone = (Bitmap)bmp.Clone();
@@ -2059,7 +2083,7 @@ namespace HvsMvp.App
                     ? $"✅ {s.Metals.Count} metais, {s.Crystals.Count} cristais, {s.Gems.Count} gemas" 
                     : "⚠️ Nenhum material detectado";
                 
-                AppendLog($"Análise HVS completa: {materiaisEncontrados}");
+                AppendLog($"Análise HVS completa: {materiaisEncontrados} ({stopwatch.ElapsedMilliseconds}ms)");
 
                 _lblStatus.Text =
                     $"Qualidade: {s.QualityIndex:F1} ({s.QualityStatus}) · Foco={s.Diagnostics.FocusScorePercent:F1} · Exposição={s.Diagnostics.ExposureScore:F1} · Máscara={s.Diagnostics.MaskScore:F1}";
@@ -2076,6 +2100,7 @@ namespace HvsMvp.App
             }
             catch (Exception ex)
             {
+                _sessionLogger?.LogError("Analysis failed", ex);
                 AppendLog($"❌ Erro ao executar análise: {ex.Message}");
             }
         }
