@@ -484,10 +484,11 @@ namespace HvsMvp.App
             var lblHint = new Label
             {
                 Location = new Point(35, y),
-                Size = new Size(480, 40),
-                Text = "O log estruturado registra ID de sessão, parâmetros, análises e\ntempo de operação para auditoria e rastreabilidade.",
+                Size = new Size(480, 45),
+                Text = "O log estruturado registra ID de sessão, parâmetros, análises e tempo de operação para auditoria e rastreabilidade.",
                 ForeColor = Color.FromArgb(150, 160, 180),
-                Font = new Font("Segoe UI", 8)
+                Font = new Font("Segoe UI", 8),
+                AutoEllipsis = false
             };
             tab.Controls.Add(lblHint);
 
