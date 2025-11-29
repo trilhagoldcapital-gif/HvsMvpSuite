@@ -1117,7 +1117,7 @@ namespace HvsMvp.App
             var menuAjuda = new ToolStripMenuItem("❓ Ajuda");
             menuAjuda.DropDownItems.Add(CreateMenuItem("ℹ️ Sobre...", "F1", (s, e) => BtnAbout_Click(s, e)));
             menuAjuda.DropDownItems.Add(new ToolStripSeparator());
-            menuAjuda.DropDownItems.Add(CreateMenuItem("🔄 Verificar atualizações...", null, async (s, e) => await CheckForUpdatesManuallyAsync()));
+            menuAjuda.DropDownItems.Add(CreateMenuItem("🔄 Verificar atualizações...", null, (s, e) => CheckForUpdatesFromMenu()));
             _mainMenuBar.Items.Add(menuAjuda);
 
             // Register keyboard shortcuts
@@ -1217,6 +1217,21 @@ namespace HvsMvp.App
         }
 
         /// <summary>
+        /// PR13: Menu handler for checking updates - safely wraps async call.
+        /// </summary>
+        private async void CheckForUpdatesFromMenu()
+        {
+            try
+            {
+                await CheckForUpdatesManuallyAsync();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao verificar atualizações: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// PR13: Manually check for updates from menu.
         /// </summary>
         private async Task CheckForUpdatesManuallyAsync()
@@ -1289,6 +1304,9 @@ namespace HvsMvp.App
         /// </summary>
         private void PopulateRecentFilesMenu(ToolStripMenuItem menu)
         {
+            const int MaxDisplayNameLength = 40;
+            const int TruncatedNameLength = 37;
+            
             menu.DropDownItems.Clear();
 
             if (_appSettings.RecentFiles.Count == 0)
@@ -1307,9 +1325,9 @@ namespace HvsMvp.App
                 if (string.IsNullOrWhiteSpace(filePath)) continue;
                 
                 string displayName = Path.GetFileName(filePath);
-                if (displayName.Length > 40)
+                if (displayName.Length > MaxDisplayNameLength)
                 {
-                    displayName = "..." + displayName.Substring(displayName.Length - 37);
+                    displayName = "..." + displayName.Substring(displayName.Length - TruncatedNameLength);
                 }
                 
                 string menuText = $"{index}. {displayName}";
