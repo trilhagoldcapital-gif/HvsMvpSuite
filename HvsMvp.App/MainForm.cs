@@ -307,14 +307,14 @@ namespace HvsMvp.App
 
         private void InitializeLayout()
         {
-            // PR11: Clean, simple layout for 1366x768 compatibility
-            // Structure: Header (28px) -> Main Toolbar (36px) -> Status Bar (22px) -> Content -> Footer (22px)
-            // Total header: 86px - leaves plenty of room for content
+            // PR12: Enhanced layout with 3 toolbar rows for complete UI access
+            // Structure: Header (28px) -> Toolbar Row 1 (32px) -> Toolbar Row 2 (32px) -> Toolbar Row 3 (32px) -> Status Bar (22px) -> Content -> Footer (22px)
+            // Total header: 146px - still leaves room for content at 1366x768
             
             _topContainer = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 86,
+                Height = 146,
                 BackColor = Color.FromArgb(8, 16, 28)
             };
             Controls.Add(_topContainer);
@@ -361,11 +361,11 @@ namespace HvsMvp.App
             _hvsToolTip.SetToolTip(_btnLanguage, "Idioma / Language");
             _headerBar.Controls.Add(_btnLanguage);
 
-            // PR11: Main toolbar - single row with all main buttons visible
+            // PR12: Main toolbar Row 1 - Acquisition and Primary Actions
             var mainToolbar = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 36,
+                Height = 32,
                 BackColor = Color.FromArgb(12, 24, 40),
                 Padding = new Padding(4, 2, 4, 2)
             };
@@ -377,27 +377,27 @@ namespace HvsMvp.App
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
-                AutoScroll = true,
+                AutoScroll = false,
                 Padding = new Padding(0)
             };
             mainToolbar.Controls.Add(_toolbarRow1);
 
-            // PR11: Helper to create toolbar buttons (compact, visible)
-            Button ToolbarBtn(string text, string tooltip, bool highlight = false, bool primary = false)
+            // PR12: Helper to create toolbar buttons (compact, visible)
+            Button ToolbarBtn(string text, string tooltip, bool highlight = false, bool primary = false, int minWidth = 50)
             {
                 var b = new Button
                 {
                     Text = text,
                     AutoSize = true,
-                    MinimumSize = new Size(60, 28),
-                    MaximumSize = new Size(100, 30),
-                    Margin = new Padding(2, 1, 2, 1),
-                    Padding = new Padding(4, 0, 4, 0),
+                    MinimumSize = new Size(minWidth, 26),
+                    MaximumSize = new Size(95, 26),
+                    Margin = new Padding(1, 1, 1, 1),
+                    Padding = new Padding(3, 0, 3, 0),
                     BackColor = primary ? Color.FromArgb(50, 90, 130) : 
                                 highlight ? Color.FromArgb(40, 70, 100) : Color.FromArgb(25, 45, 70),
                     ForeColor = Color.WhiteSmoke,
                     FlatStyle = FlatStyle.Flat,
-                    Font = new Font("Segoe UI", 8.5f),
+                    Font = new Font("Segoe UI", 8f),
                     TextAlign = ContentAlignment.MiddleCenter
                 };
                 b.FlatAppearance.BorderColor = primary ? Color.FromArgb(100, 150, 200) :
@@ -409,22 +409,41 @@ namespace HvsMvp.App
                 return b;
             }
 
-            // PR11: Separator helper
+            // PR12: Separator helper
             Panel ToolbarSeparator()
             {
                 return new Panel
                 {
                     Width = 2,
-                    Height = 28,
+                    Height = 24,
                     BackColor = Color.FromArgb(50, 70, 100),
-                    Margin = new Padding(4, 2, 4, 2)
+                    Margin = new Padding(3, 2, 3, 2)
                 };
             }
 
-            // PR11: AQUISIÇÃO buttons
+            // PR12: Label helper for toolbar sections
+            Label ToolbarLabel(string text)
+            {
+                return new Label
+                {
+                    Text = text,
+                    AutoSize = true,
+                    ForeColor = Color.FromArgb(140, 160, 180),
+                    Font = new Font("Segoe UI", 7f, FontStyle.Bold),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Margin = new Padding(4, 6, 2, 2)
+                };
+            }
+
+            // PR12: ROW 1 - ARQUIVO / AQUISIÇÃO / ANÁLISE PRINCIPAL
+            _toolbarRow1.Controls.Add(ToolbarLabel("ARQUIVO:"));
+            
             _btnOpen = ToolbarBtn("📂 Abrir", "Abrir imagem de arquivo", primary: true);
             _btnOpen.Click += BtnOpenImage_Click;
             _toolbarRow1.Controls.Add(_btnOpen);
+
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
+            _toolbarRow1.Controls.Add(ToolbarLabel("CÂMERA:"));
 
             _btnLive = ToolbarBtn("▶ Live", "Iniciar câmera ao vivo", primary: true);
             _btnLive.Click += BtnLive_Click;
@@ -434,71 +453,230 @@ namespace HvsMvp.App
             _btnStopLive.Click += BtnParar_Click;
             _toolbarRow1.Controls.Add(_btnStopLive);
 
-            _toolbarRow1.Controls.Add(ToolbarSeparator());
+            _btnCameraSel = ToolbarBtn("🎥 Câm.", "Selecionar câmera");
+            _btnCameraSel.Click += BtnSelecionarCamera_Click;
+            _toolbarRow1.Controls.Add(_btnCameraSel);
 
-            // PR11: ANÁLISE buttons
+            _btnResolucaoSel = ToolbarBtn("📐 Res.", "Selecionar resolução");
+            _btnResolucaoSel.Click += BtnSelecionarResolucao_Click;
+            _toolbarRow1.Controls.Add(_btnResolucaoSel);
+
+            _toolbarRow1.Controls.Add(ToolbarSeparator());
+            _toolbarRow1.Controls.Add(ToolbarLabel("ANÁLISE:"));
+
             _btnAnalyze = ToolbarBtn("🧪 Analisar", "Executar análise completa", primary: true);
             _btnAnalyze.Click += BtnAnalisar_Click;
             _toolbarRow1.Controls.Add(_btnAnalyze);
 
-            _btnMask = ToolbarBtn("🎨 Másc.", "Ver máscara de segmentação");
-            _btnMask.Click += BtnMascara_Click;
-            _toolbarRow1.Controls.Add(_btnMask);
+            _btnContinuous = ToolbarBtn("⚙ Contínuo", "Análise contínua");
+            _btnContinuous.Click += BtnContinuous_Click;
+            _toolbarRow1.Controls.Add(_btnContinuous);
+
+            _btnStopContinuous = ToolbarBtn("⏸ Parar", "Parar análise contínua");
+            _btnStopContinuous.Click += BtnStopContinuous_Click;
+            _toolbarRow1.Controls.Add(_btnStopContinuous);
 
             _toolbarRow1.Controls.Add(ToolbarSeparator());
+            _toolbarRow1.Controls.Add(ToolbarLabel("ZOOM:"));
 
-            // PR11: RELATÓRIOS buttons
-            _btnPdf = ToolbarBtn("📄 PDF", "Exportar laudo PDF", primary: true);
-            _btnPdf.Click += BtnPdf_Click;
-            _toolbarRow1.Controls.Add(_btnPdf);
-
-            _btnTxt = ToolbarBtn("📝 TXT", "Exportar laudo TXT");
-            _btnTxt.Click += BtnTxt_Click;
-            _toolbarRow1.Controls.Add(_btnTxt);
-
-            _toolbarRow1.Controls.Add(ToolbarSeparator());
-
-            // PR11: ZOOM buttons
-            _btnZoomIn = ToolbarBtn("🔍+", "Aumentar zoom");
-            _btnZoomIn.MinimumSize = new Size(40, 28);
+            _btnZoomIn = ToolbarBtn("🔍+", "Aumentar zoom", minWidth: 36);
             _btnZoomIn.Click += BtnZoomMais_Click;
             _toolbarRow1.Controls.Add(_btnZoomIn);
 
-            _btnZoomOut = ToolbarBtn("🔍-", "Diminuir zoom");
-            _btnZoomOut.MinimumSize = new Size(40, 28);
+            _btnZoomOut = ToolbarBtn("🔍-", "Diminuir zoom", minWidth: 36);
             _btnZoomOut.Click += BtnZoomMenos_Click;
             _toolbarRow1.Controls.Add(_btnZoomOut);
 
-            _toolbarRow1.Controls.Add(ToolbarSeparator());
+            // PR12: Toolbar Row 2 - Visualization and Selective Analysis
+            var toolbar2 = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 32,
+                BackColor = Color.FromArgb(10, 20, 35),
+                Padding = new Padding(4, 2, 4, 2)
+            };
+            _topContainer.Controls.Add(toolbar2);
+            toolbar2.BringToFront();
 
-            // PR11: Target combo (compact)
-            var targetPanel = new Panel { Size = new Size(120, 28), Margin = new Padding(2, 2, 2, 2) };
+            _toolbarRow2 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = false,
+                Padding = new Padding(0)
+            };
+            toolbar2.Controls.Add(_toolbarRow2);
+
+            // PR12: ROW 2 - VISUALIZAÇÃO / SELETIVA / ALVO
+            _toolbarRow2.Controls.Add(ToolbarLabel("VER:"));
+
+            _btnMask = ToolbarBtn("🎨 Másc.", "Ver máscara de segmentação", highlight: true);
+            _btnMask.Click += BtnMascara_Click;
+            _toolbarRow2.Controls.Add(_btnMask);
+
+            _btnMaskBg = ToolbarBtn("🖼 Fundo", "Fundo mascarado");
+            _btnMaskBg.Click += BtnFundoMasc_Click;
+            _toolbarRow2.Controls.Add(_btnMaskBg);
+
+            _btnPhaseMap = ToolbarBtn("🗺 Fases", "Mapa de fases");
+            _btnPhaseMap.Click += BtnPhaseMap_Click;
+            _toolbarRow2.Controls.Add(_btnPhaseMap);
+
+            _btnHeatmap = ToolbarBtn("🔥 Heat", "Heatmap do alvo");
+            _btnHeatmap.Click += BtnHeatmap_Click;
+            _toolbarRow2.Controls.Add(_btnHeatmap);
+
+            _toolbarRow2.Controls.Add(ToolbarSeparator());
+            _toolbarRow2.Controls.Add(ToolbarLabel("SELETIVA:"));
+
+            _btnSelectiveAnalyze = ToolbarBtn("🎯 Seletiva", "Análise seletiva por alvo", primary: true);
+            _btnSelectiveAnalyze.Click += BtnSelectiveAnalyze_Click;
+            _toolbarRow2.Controls.Add(_btnSelectiveAnalyze);
+
+            // PR12: X-ray mode checkbox (visible)
+            _chkXrayMode = new CheckBox
+            {
+                Text = "X-ray",
+                AutoSize = true,
+                ForeColor = Color.WhiteSmoke,
+                Font = new Font("Segoe UI", 8f),
+                Margin = new Padding(4, 5, 2, 2),
+                Checked = false
+            };
+            _chkXrayMode.CheckedChanged += ChkXrayMode_CheckedChanged;
+            _toolbarRow2.Controls.Add(_chkXrayMode);
+
+            // PR12: Show uncertainty checkbox (visible)
+            _chkShowUncertainty = new CheckBox
+            {
+                Text = "Incerteza",
+                AutoSize = true,
+                ForeColor = Color.WhiteSmoke,
+                Font = new Font("Segoe UI", 8f),
+                Margin = new Padding(4, 5, 2, 2),
+                Checked = false
+            };
+            _chkShowUncertainty.CheckedChanged += ChkShowUncertainty_CheckedChanged;
+            _toolbarRow2.Controls.Add(_chkShowUncertainty);
+
+            _toolbarRow2.Controls.Add(ToolbarSeparator());
+            _toolbarRow2.Controls.Add(ToolbarLabel("ALVO:"));
+
+            // PR12: Target combo (compact)
+            var targetPanel = new Panel { Size = new Size(115, 26), Margin = new Padding(2, 2, 2, 2) };
             _cbTarget = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 Location = new Point(0, 2),
-                Size = new Size(116, 24),
+                Size = new Size(112, 22),
                 BackColor = Color.FromArgb(32, 32, 44),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8)
             };
             targetPanel.Controls.Add(_cbTarget);
-            _toolbarRow1.Controls.Add(targetPanel);
+            _toolbarRow2.Controls.Add(targetPanel);
 
-            _toolbarRow1.Controls.Add(ToolbarSeparator());
+            _toolbarRow2.Controls.Add(ToolbarSeparator());
 
-            // PR11: SISTEMA buttons (compact)
-            _btnSettings = ToolbarBtn("⚙️", "Configurações");
-            _btnSettings.MinimumSize = new Size(32, 28);
+            _btnTraining = ToolbarBtn("🎯 Treino", "Modo treino (rotular partículas)");
+            _btnTraining.Click += BtnTraining_Click;
+            _toolbarRow2.Controls.Add(_btnTraining);
+
+            _btnQaPanel = ToolbarBtn("✅ QA", "QA de partículas");
+            _btnQaPanel.Click += BtnQaPanel_Click;
+            _toolbarRow2.Controls.Add(_btnQaPanel);
+
+            // PR12: Toolbar Row 3 - Export and System
+            var toolbar3 = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 32,
+                BackColor = Color.FromArgb(8, 16, 30),
+                Padding = new Padding(4, 2, 4, 2)
+            };
+            _topContainer.Controls.Add(toolbar3);
+            toolbar3.BringToFront();
+
+            _toolbarRow3 = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoScroll = false,
+                Padding = new Padding(0)
+            };
+            toolbar3.Controls.Add(_toolbarRow3);
+
+            // PR12: ROW 3 - RELATÓRIOS / EXPORTAR / SISTEMA
+            _toolbarRow3.Controls.Add(ToolbarLabel("LAUDO:"));
+
+            _btnPdf = ToolbarBtn("📄 PDF", "Exportar laudo PDF", primary: true);
+            _btnPdf.Click += BtnPdf_Click;
+            _toolbarRow3.Controls.Add(_btnPdf);
+
+            _btnTxt = ToolbarBtn("📝 TXT", "Exportar laudo TXT");
+            _btnTxt.Click += BtnTxt_Click;
+            _toolbarRow3.Controls.Add(_btnTxt);
+
+            _btnWhatsApp = ToolbarBtn("💬 Zap", "Compartilhar via WhatsApp");
+            _btnWhatsApp.Click += BtnWhatsApp_Click;
+            _toolbarRow3.Controls.Add(_btnWhatsApp);
+
+            _toolbarRow3.Controls.Add(ToolbarSeparator());
+            _toolbarRow3.Controls.Add(ToolbarLabel("EXPORT:"));
+
+            _btnJson = ToolbarBtn("{} JSON", "Exportar JSON");
+            _btnJson.Click += BtnJson_Click;
+            _toolbarRow3.Controls.Add(_btnJson);
+
+            _btnCsv = ToolbarBtn("📊 CSV", "Exportar CSV");
+            _btnCsv.Click += BtnCsv_Click;
+            _toolbarRow3.Controls.Add(_btnCsv);
+
+            _btnBiCsv = ToolbarBtn("📈 BI", "Exportar BI CSV");
+            _btnBiCsv.Click += BtnBiCsv_Click;
+            _toolbarRow3.Controls.Add(_btnBiCsv);
+
+            _btnExportIa = ToolbarBtn("🤖 IA", "Exportar dataset IA");
+            _btnExportIa.Click += BtnExportIa_Click;
+            _toolbarRow3.Controls.Add(_btnExportIa);
+
+            _btnAi = ToolbarBtn("🔬 Part.", "Abrir pasta de datasets IA");
+            _btnAi.Click += BtnParticulas_Click;
+            _toolbarRow3.Controls.Add(_btnAi);
+
+            _toolbarRow3.Controls.Add(ToolbarSeparator());
+            _toolbarRow3.Controls.Add(ToolbarLabel("UTIL:"));
+
+            _btnWB = ToolbarBtn("⚪ WB", "Balanço de branco");
+            _btnWB.Click += BtnBalanco_Click;
+            _toolbarRow3.Controls.Add(_btnWB);
+
+            _btnScale = ToolbarBtn("📏 Escala", "Ferramenta de escala");
+            _btnScale.Click += BtnEscala_Click;
+            _toolbarRow3.Controls.Add(_btnScale);
+
+            _btnCalib = ToolbarBtn("📸 Calib.", "Calibrar (snapshot)");
+            _btnCalib.Click += BtnCalibrarAuto_Click;
+            _toolbarRow3.Controls.Add(_btnCalib);
+
+            _btnDebugHvs = ToolbarBtn("🛠 Debug", "Debug HVS (avançado)");
+            _btnDebugHvs.Click += BtnDebugHvs_Click;
+            _toolbarRow3.Controls.Add(_btnDebugHvs);
+
+            _toolbarRow3.Controls.Add(ToolbarSeparator());
+            _toolbarRow3.Controls.Add(ToolbarLabel("SIS:"));
+
+            _btnSettings = ToolbarBtn("⚙️ Config", "Configurações");
             _btnSettings.Click += BtnSettings_Click;
-            _toolbarRow1.Controls.Add(_btnSettings);
+            _toolbarRow3.Controls.Add(_btnSettings);
 
-            _btnAbout = ToolbarBtn("ℹ️", "Sobre o aplicativo");
-            _btnAbout.MinimumSize = new Size(32, 28);
+            _btnAbout = ToolbarBtn("ℹ️ Sobre", "Sobre o aplicativo");
             _btnAbout.Click += BtnAbout_Click;
-            _toolbarRow1.Controls.Add(_btnAbout);
+            _toolbarRow3.Controls.Add(_btnAbout);
 
-            // PR11: Status info bar
+            // PR12: Status info bar
             _statusInfoBar = new Panel
             {
                 Dock = DockStyle.Top,
@@ -519,69 +697,17 @@ namespace HvsMvp.App
             };
             _statusInfoBar.Controls.Add(_lblStatusInfo);
 
-            // PR11: Initialize hidden buttons (for compatibility with existing code)
-            // These buttons are not in the main toolbar but can be accessed via menus or other means
-            _btnContinuous = new Button { Visible = false };
-            _btnContinuous.Click += BtnContinuous_Click;
-            _btnStopContinuous = new Button { Visible = false };
-            _btnStopContinuous.Click += BtnStopContinuous_Click;
-            _btnCameraSel = new Button { Visible = false };
-            _btnCameraSel.Click += BtnSelecionarCamera_Click;
-            _btnResolucaoSel = new Button { Visible = false };
-            _btnResolucaoSel.Click += BtnSelecionarResolucao_Click;
-            _btnSelectiveAnalyze = new Button { Visible = false };
-            _btnSelectiveAnalyze.Click += BtnSelectiveAnalyze_Click;
-            _btnMaskBg = new Button { Visible = false };
-            _btnMaskBg.Click += BtnFundoMasc_Click;
-            _btnPhaseMap = new Button { Visible = false };
-            _btnPhaseMap.Click += BtnPhaseMap_Click;
-            _btnHeatmap = new Button { Visible = false };
-            _btnHeatmap.Click += BtnHeatmap_Click;
-            _btnScale = new Button { Visible = false };
-            _btnScale.Click += BtnEscala_Click;
-            _btnWB = new Button { Visible = false };
-            _btnWB.Click += BtnBalanco_Click;
-            _btnJson = new Button { Visible = false };
-            _btnJson.Click += BtnJson_Click;
-            _btnCsv = new Button { Visible = false };
-            _btnCsv.Click += BtnCsv_Click;
-            _btnBiCsv = new Button { Visible = false };
-            _btnBiCsv.Click += BtnBiCsv_Click;
-            _btnAi = new Button { Visible = false };
-            _btnAi.Click += BtnParticulas_Click;
-            _btnExportIa = new Button { Visible = false };
-            _btnExportIa.Click += BtnExportIa_Click;
-            _btnQaPanel = new Button { Visible = false };
-            _btnQaPanel.Click += BtnQaPanel_Click;
-            _btnTraining = new Button { Visible = false };
-            _btnTraining.Click += BtnTraining_Click;
-            _btnWhatsApp = new Button { Visible = false };
-            _btnWhatsApp.Click += BtnWhatsApp_Click;
-            _btnDebugHvs = new Button { Visible = false };
-            _btnDebugHvs.Click += BtnDebugHvs_Click;
-            _btnCalib = new Button { Visible = false };
-            _btnCalib.Click += BtnCalibrarAuto_Click;
-            
-            // PR11: Quick access buttons (for compatibility)
+            // PR12: Quick access buttons (for compatibility - pointing to main buttons)
             _btnQuickOpen = _btnOpen;
             _btnQuickLive = _btnLive;
             _btnQuickAnalyze = _btnAnalyze;
             _btnQuickPdf = _btnPdf;
             
-            // PR11: Checkboxes (hidden, for compatibility)
-            _chkXrayMode = new CheckBox { Visible = false, Checked = false };
-            _chkXrayMode.CheckedChanged += ChkXrayMode_CheckedChanged;
-            _chkShowUncertainty = new CheckBox { Visible = false, Checked = false };
-            _chkShowUncertainty.CheckedChanged += ChkShowUncertainty_CheckedChanged;
-            
-            // PR11: Quick access bar (for compatibility)
+            // PR12: Quick access bar - kept for potential future use/compatibility
+            // Not currently used but field exists in class definition
             _quickAccessBar = new Panel { Visible = false };
-            
-            // PR11: Toolbar rows (for compatibility)
-            _toolbarRow2 = _toolbarRow1;
-            _toolbarRow3 = _toolbarRow1;
 
-            // PR11: Main content area - simple split: top (image+materials) / bottom (log)
+            // PR12: Main content area - simple split: top (image+materials) / bottom (log)
             _mainVerticalSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
@@ -597,7 +723,7 @@ namespace HvsMvp.App
             _mainVerticalSplit.Panel1MinSize = 200;
             _mainVerticalSplit.Panel2MinSize = 80;
 
-            // PR11: Upper area split - left (image) / right (materials)
+            // PR12: Upper area split - left (image) / right (materials)
             _contentVerticalSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
@@ -612,7 +738,7 @@ namespace HvsMvp.App
             _contentVerticalSplit.Panel1MinSize = 300;
             _contentVerticalSplit.Panel2MinSize = 200;
 
-            // PR11: For compatibility with old code
+            // PR12: For compatibility with old code
             _cameraMaterialsSplit = _contentVerticalSplit;
 
             _imagePanel = new Panel
@@ -735,7 +861,7 @@ namespace HvsMvp.App
             _listGems.SelectedIndexChanged += (s, e) =>
                 ShowMaterialDetails(_config?.Materials?.Gemas?.ElementAtOrDefault(_listGems.SelectedIndex));
 
-            // PR11: Log panel with control bar (in bottom panel of main split)
+            // PR12: Log panel with control bar (in bottom panel of main split)
             var logContainer = new Panel
             {
                 Dock = DockStyle.Fill,
@@ -851,10 +977,10 @@ namespace HvsMvp.App
 
             ApplyLocaleTexts();
             
-            // PR11: Initialize button enabled states
+            // PR12: Initialize button enabled states
             UpdateButtonEnabledStates();
             
-            // PR11: Set initial splitter distance after load
+            // PR12: Set initial splitter distance after load
             this.Load += (s, e) =>
             {
                 try
@@ -1163,7 +1289,7 @@ namespace HvsMvp.App
         }
         
         /// <summary>
-        /// PR9: Updates button enabled state based on context.
+        /// PR12: Updates button enabled state based on context.
         /// </summary>
         private void UpdateButtonEnabledStates()
         {
@@ -1173,6 +1299,7 @@ namespace HvsMvp.App
             // Analysis buttons - require image
             _btnAnalyze.Enabled = hasImage;
             _btnQuickAnalyze.Enabled = hasImage;
+            _btnContinuous.Enabled = hasImage;
             
             // View mode buttons - require analysis
             _btnSelectiveAnalyze.Enabled = hasAnalysis;
@@ -1188,8 +1315,15 @@ namespace HvsMvp.App
             _btnJson.Enabled = hasAnalysis;
             _btnCsv.Enabled = hasAnalysis;
             _btnBiCsv.Enabled = hasAnalysis;
+            _btnWhatsApp.Enabled = hasAnalysis;
             _btnExportIa.Enabled = hasAnalysis && (_lastScene?.Summary?.Particles?.Count ?? 0) > 0;
             _btnQaPanel.Enabled = hasAnalysis && (_lastScene?.Summary?.Particles?.Count ?? 0) > 0;
+            
+            // Calibration button - requires image
+            _btnCalib.Enabled = hasImage;
+            
+            // Debug button - requires analysis
+            _btnDebugHvs.Enabled = hasAnalysis;
         }
 
         private void BtnLive_Click(object? sender, EventArgs e)
