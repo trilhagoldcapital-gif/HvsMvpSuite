@@ -1674,20 +1674,17 @@ namespace HvsMvp.App
                 {
                     try
                     {
-                        // PR18: Clone the frame to keep a copy
-                        var clonedFrame = (Bitmap)frame.Clone();
-                        
-                        // Update hidden PictureBox for compatibility with analysis methods
-                        var old = _pictureSample.Image;
-                        _pictureSample.Image = clonedFrame;
-                        old?.Dispose();
+                        // PR18: Update PictureBox (for analysis compatibility)
+                        var oldPicture = _pictureSample.Image;
+                        _pictureSample.Image = (Bitmap)frame.Clone();
+                        oldPicture?.Dispose();
 
-                        // PR18: Update ZoomPanControl directly for live display
-                        // Use UpdateImage() instead of Image setter to avoid reset on every frame
+                        // PR18: Update ZoomPanControl with a separate clone
+                        // Each control needs its own copy to avoid disposal issues
                         if (_zoomPanControl != null)
                         {
                             // For live streaming, UpdateImage avoids zoom/pan reset
-                            _zoomPanControl.UpdateImage(clonedFrame);
+                            _zoomPanControl.UpdateImage((Bitmap)frame.Clone());
                         }
                     }
                     finally

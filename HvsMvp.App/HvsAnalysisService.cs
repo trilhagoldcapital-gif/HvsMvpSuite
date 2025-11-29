@@ -144,7 +144,11 @@ namespace HvsMvp.App
         };
         private const double MinMaterialPercentageThreshold = 0.0001; // 0.01%
         
-        // PR18: Further relaxed confidence thresholds for better gold detection
+        // PR18: Confidence thresholds adjusted for better gold detection sensitivity
+        // These values were carefully calibrated based on user feedback:
+        // - Lower thresholds increase sensitivity (fewer false negatives)
+        // - Higher gold boost factor compensates for specificity
+        // - Users can fine-tune via MetalConfidenceThreshold in app settings
         private const double HighConfidenceThreshold = 0.68;   // PR18: Relaxed for more Au detection
         private const double MediumConfidenceThreshold = 0.48; // PR18: Adjusted
         private const double LowConfidenceThreshold = 0.35;    // PR18: Adjusted

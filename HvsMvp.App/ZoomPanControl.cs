@@ -73,7 +73,10 @@ namespace HvsMvp.App
             get => _image;
             set
             {
+                // PR18: Dispose old image to prevent memory leak
+                var oldImage = _image;
                 _image = value;
+                oldImage?.Dispose();
                 ResetView();
             }
         }
@@ -83,10 +86,16 @@ namespace HvsMvp.App
 
         /// <summary>
         /// Set a new image without resetting view (for frame updates).
+        /// PR18: Properly disposes old image to prevent memory leak during live streaming.
         /// </summary>
         public void UpdateImage(Bitmap newImage)
         {
+            var oldImage = _image;
             _image = newImage;
+            
+            // PR18: Dispose old image to prevent memory leak
+            oldImage?.Dispose();
+            
             Invalidate();
         }
 
