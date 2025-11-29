@@ -8,10 +8,14 @@ namespace HvsMvp.App
 {
     /// <summary>
     /// Service for generating professional reports (TXT and PDF).
+    /// PR17: Added localization support for multi-language reports.
     /// </summary>
     public class ReportService
     {
         private readonly AppSettings _settings;
+        
+        // PR17: Helper to get localized string
+        private string L(string key) => LocalizationService.Instance.Get(key);
 
         public ReportService(AppSettings settings)
         {
@@ -97,11 +101,41 @@ namespace HvsMvp.App
             // SEÇÃO METAIS
             // ═══════════════════════════════════════════
             sb.AppendLine("───────────────────────────────────────────────────────────────────");
-            sb.AppendLine("  METAIS DETECTADOS");
+            sb.AppendLine($"  {L("report.metals.detected")}");
             sb.AppendLine("───────────────────────────────────────────────────────────────────");
             sb.AppendLine();
-            sb.AppendLine("  Metal           | Score   | % Amostra | PPM        | Grupo");
-            sb.AppendLine("  ────────────────┼─────────┼───────────┼────────────┼──────────");
+            
+            // PR17: Add special gold confidence indicator section
+            var goldResult = result.Metals.Find(m => m.Id == "Au");
+            if (goldResult != null)
+            {
+                string goldConfidence = GetGoldConfidenceIndicator(goldResult);
+                sb.AppendLine($"  {L("report.gold.indicator")}");
+                sb.AppendLine($"     {L("report.table.score")}: {goldResult.Score:F3} | {L("report.table.confidence")}: {goldConfidence}");
+                sb.AppendLine($"     Fração: {goldResult.PctSample:P4} | PPM: {goldResult.PpmEstimated?.ToString("F0") ?? "-"}");
+                
+                // Add detailed confidence message
+                if (goldResult.Score >= 0.72)
+                {
+                    sb.AppendLine($"     {L("report.gold.high.confidence")}");
+                }
+                else if (goldResult.Score >= 0.52)
+                {
+                    sb.AppendLine($"     {L("report.gold.medium.confidence")}");
+                }
+                else if (goldResult.Score >= 0.38)
+                {
+                    sb.AppendLine($"     {L("report.gold.low.confidence")}");
+                }
+                else
+                {
+                    sb.AppendLine($"     {L("report.gold.indeterminate")}");
+                }
+                sb.AppendLine();
+            }
+            
+            sb.AppendLine($"  {L("report.table.metal").PadRight(14)} | {L("report.table.score").PadLeft(7)} | {L("report.table.confidence").PadLeft(9)} | {L("report.table.sample.pct").PadLeft(9)} | {L("report.table.ppm").PadLeft(10)} | {L("report.table.group")}");
+            sb.AppendLine("  ────────────────┼─────────┼───────────┼───────────┼────────────┼──────────");
             
             foreach (var m in result.Metals)
             {
@@ -109,10 +143,11 @@ namespace HvsMvp.App
                 {
                     string name = (m.Name ?? m.Id).PadRight(14);
                     string score = m.Score.ToString("F3").PadLeft(7);
+                    string confidence = GetConfidenceLevel(m.Score).PadLeft(9);
                     string pct = m.PctSample.ToString("P4").PadLeft(9);
                     string ppm = (m.PpmEstimated?.ToString("F0") ?? "-").PadLeft(10);
                     string group = (m.Group ?? "-").PadRight(8);
-                    sb.AppendLine($"  {name} | {score} | {pct} | {ppm} | {group}");
+                    sb.AppendLine($"  {name} | {score} | {confidence} | {pct} | {ppm} | {group}");
                 }
             }
             sb.AppendLine();
@@ -393,6 +428,30 @@ namespace HvsMvp.App
             gfx.DrawString(label, font, XBrushes.Gray, margin, y);
             gfx.DrawString(value, font, XBrushes.Black, margin + 100, y);
             y += 14;
+        }
+        
+        /// <summary>
+        /// PR17: Get confidence level string for a score (localized).
+        /// </summary>
+        private string GetConfidenceLevel(double score)
+        {
+            if (score >= 0.85) return L("report.confidence.very.high");
+            if (score >= 0.72) return L("report.confidence.high");
+            if (score >= 0.52) return L("report.confidence.medium");
+            if (score >= 0.38) return L("report.confidence.low");
+            return L("report.confidence.indet");
+        }
+        
+        /// <summary>
+        /// PR17: Get detailed gold confidence indicator (localized).
+        /// </summary>
+        private string GetGoldConfidenceIndicator(MetalResult gold)
+        {
+            if (gold.Score >= 0.85) return $"🟢 {L("report.confidence.very.high")} (>85%)";
+            if (gold.Score >= 0.72) return $"🟢 {L("report.confidence.high")} (72-85%)";
+            if (gold.Score >= 0.52) return $"🟡 {L("report.confidence.medium")} (52-72%)";
+            if (gold.Score >= 0.38) return $"🟠 {L("report.confidence.low")} (38-52%)";
+            return $"🔴 {L("report.confidence.indet")} (<38%)";
         }
 
         private string GetReportsDirectory()
