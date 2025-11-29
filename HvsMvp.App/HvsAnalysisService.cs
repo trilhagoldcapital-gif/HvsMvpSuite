@@ -540,20 +540,21 @@ namespace HvsMvp.App
         /// - Compara QualityIndex e %Au nas 3 rodadas.
         /// - Se convergir: QualityStatus = "OfficialRechecked".
         /// - Se divergir:  QualityStatus = "ReviewRequired".
+        /// PR16: Updated to accept ROI parameter for consistent sample/background separation.
         /// </summary>
-        public SampleFullAnalysisResult RunWithAutoReanalysis(Bitmap bmp, string? imagePath)
+        public SampleFullAnalysisResult RunWithAutoReanalysis(Bitmap bmp, string? imagePath, RoiDefinition? roi = null)
         {
-            // 1) Primeira análise normal
-            var scene1 = AnalyzeScene(bmp, imagePath);
+            // 1) Primeira análise normal (PR16: pass ROI)
+            var scene1 = AnalyzeScene(bmp, imagePath, roi);
             var r1 = scene1.Summary;
 
             // Se não for "Invalid", não é amostra crítica: retorna direto
             if (!string.Equals(r1.QualityStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
                 return r1;
 
-            // 2) Amostra crítica -> executar mais 2 análises completas na mesma imagem
-            var scene2 = AnalyzeScene(bmp, imagePath);
-            var scene3 = AnalyzeScene(bmp, imagePath);
+            // 2) Amostra crítica -> executar mais 2 análises completas na mesma imagem (PR16: pass ROI)
+            var scene2 = AnalyzeScene(bmp, imagePath, roi);
+            var scene3 = AnalyzeScene(bmp, imagePath, roi);
             var r2 = scene2.Summary;
             var r3 = scene3.Summary;
 

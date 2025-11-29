@@ -2164,7 +2164,8 @@ namespace HvsMvp.App
                 if (string.Equals(scene.Summary.QualityStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
                 {
                     AppendLog("🔄 Qualidade baixa detectada, executando reanálise automática...");
-                    var reanalyzedSummary = _analysisService.RunWithAutoReanalysis(bmp, imagePath: null);
+                    // PR16: Pass ROI to reanalysis for consistency
+                    var reanalyzedSummary = _analysisService.RunWithAutoReanalysis(bmp, imagePath: null, _roiService.CurrentRoi);
                     scene.Summary = reanalyzedSummary;
                 }
 
