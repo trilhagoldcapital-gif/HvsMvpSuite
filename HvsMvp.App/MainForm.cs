@@ -868,6 +868,11 @@ namespace HvsMvp.App
             _listGems.SelectedIndexChanged += (s, e) =>
                 ShowMaterialDetails(_config?.Materials?.Gemas?.ElementAtOrDefault(_listGems.SelectedIndex));
 
+            // PR13: Add double-click handlers to show detailed material dialogs
+            _listMetals.DoubleClick += ListMetals_DoubleClick;
+            _listCrystals.DoubleClick += ListCrystals_DoubleClick;
+            _listGems.DoubleClick += ListGems_DoubleClick;
+
             // PR12: Log panel with control bar (in bottom panel of main split)
             var logContainer = new Panel
             {
@@ -1074,6 +1079,9 @@ namespace HvsMvp.App
             menuRelatorios.DropDownItems.Add(CreateMenuItem("📄 Exportar PDF...", "Ctrl+P", (s, e) => BtnPdf_Click(s, e)));
             menuRelatorios.DropDownItems.Add(CreateMenuItem("📝 Exportar TXT...", "Ctrl+T", (s, e) => BtnTxt_Click(s, e)));
             menuRelatorios.DropDownItems.Add(CreateMenuItem("💬 Compartilhar WhatsApp", null, (s, e) => BtnWhatsApp_Click(s, e)));
+            menuRelatorios.DropDownItems.Add(new ToolStripSeparator());
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("👁️ Ver último relatório", null, (s, e) => ViewLastReport()));
+            menuRelatorios.DropDownItems.Add(CreateMenuItem("📂 Abrir pasta de relatórios", null, (s, e) => OpenReportsFolder()));
             menuRelatorios.DropDownItems.Add(new ToolStripSeparator());
             menuRelatorios.DropDownItems.Add(CreateMenuItem("{} Exportar JSON", null, (s, e) => BtnJson_Click(s, e)));
             menuRelatorios.DropDownItems.Add(CreateMenuItem("📊 Exportar CSV", null, (s, e) => BtnCsv_Click(s, e)));
@@ -2639,6 +2647,76 @@ namespace HvsMvp.App
             }
         }
 
+        /// <summary>
+        /// PR13: View the last exported report in the default application.
+        /// </summary>
+        private void ViewLastReport()
+        {
+            if (string.IsNullOrWhiteSpace(_lastExportedReportPath))
+            {
+                AppendLog("Nenhum relatório exportado ainda. Exporte um laudo PDF ou TXT primeiro.");
+                MessageBox.Show(
+                    this,
+                    "Nenhum relatório exportado ainda.\n\nExporte um laudo PDF ou TXT primeiro.",
+                    "Visualizar Relatório",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!File.Exists(_lastExportedReportPath))
+            {
+                AppendLog($"Arquivo de relatório não encontrado: {_lastExportedReportPath}");
+                MessageBox.Show(
+                    this,
+                    $"Arquivo de relatório não encontrado:\n\n{_lastExportedReportPath}",
+                    "Visualizar Relatório",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _lastExportedReportPath,
+                    UseShellExecute = true
+                });
+                AppendLog($"Abrindo relatório: {_lastExportedReportPath}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao abrir relatório: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// PR13: Open the reports folder in file explorer.
+        /// </summary>
+        private void OpenReportsFolder()
+        {
+            try
+            {
+                string reportsDir = !string.IsNullOrWhiteSpace(_appSettings.ReportsDirectory)
+                    ? _appSettings.ReportsDirectory
+                    : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exports", "reports");
+                
+                Directory.CreateDirectory(reportsDir);
+                
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = reportsDir,
+                    UseShellExecute = true
+                });
+                AppendLog($"Abrindo pasta de relatórios: {reportsDir}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao abrir pasta de relatórios: {ex.Message}");
+            }
+        }
+
         private void BtnQaPanel_Click(object? sender, EventArgs e)
         {
             if (_lastScene?.Summary == null || _lastBaseImageClone == null)
@@ -3047,6 +3125,51 @@ namespace HvsMvp.App
             sb.AppendLine();
 
             _txtDetails.Text = sb.ToString();
+        }
+
+        /// <summary>
+        /// PR13: Show detailed metal dialog on double-click.
+        /// </summary>
+        private void ListMetals_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null) return;
+            
+            int idx = _listMetals.SelectedIndex;
+            if (idx < 0 || idx >= _lastScene.Summary.Metals.Count) return;
+            
+            var metal = _lastScene.Summary.Metals[idx];
+            using var dlg = new MaterialDetailDialog(metal, _lastScene.Summary);
+            dlg.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// PR13: Show detailed crystal dialog on double-click.
+        /// </summary>
+        private void ListCrystals_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null) return;
+            
+            int idx = _listCrystals.SelectedIndex;
+            if (idx < 0 || idx >= _lastScene.Summary.Crystals.Count) return;
+            
+            var crystal = _lastScene.Summary.Crystals[idx];
+            using var dlg = new MaterialDetailDialog(crystal, _lastScene.Summary);
+            dlg.ShowDialog(this);
+        }
+
+        /// <summary>
+        /// PR13: Show detailed gem dialog on double-click.
+        /// </summary>
+        private void ListGems_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_lastScene?.Summary == null) return;
+            
+            int idx = _listGems.SelectedIndex;
+            if (idx < 0 || idx >= _lastScene.Summary.Gems.Count) return;
+            
+            var gem = _lastScene.Summary.Gems[idx];
+            using var dlg = new MaterialDetailDialog(gem, _lastScene.Summary);
+            dlg.ShowDialog(this);
         }
 
         // PR8: X-ray mode checkbox handler
