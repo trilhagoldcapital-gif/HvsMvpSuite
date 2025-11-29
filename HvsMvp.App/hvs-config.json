@@ -55,11 +55,12 @@
         "optico": {
           "brilho_lustre": "muito alto",
           "cor_hsv": {
-            "h": [40, 65],
-            "s": [0.20, 1.0],
-            "v": [0.30, 1.0]
+            "h": [35, 70],
+            "s": [0.25, 1.0],
+            "v": [0.40, 1.0]
           },
-          "fluorescencia_uv": "muito baixa"
+          "fluorescencia_uv": "muito baixa",
+          "discriminacao": "Requer saturação mínima 0.25 e tom quente (amarelo/dourado)"
         }
       },
       {
@@ -69,11 +70,12 @@
         "optico": {
           "brilho_lustre": "muito alto",
           "cor_hsv": {
-            "h": [0, 10],
-            "s": [0.0, 0.15],
-            "v": [0.85, 1.0]
+            "h": [0, 360],
+            "s": [0.0, 0.10],
+            "v": [0.88, 1.0]
           },
-          "fluorescencia_uv": "baixa"
+          "fluorescencia_uv": "baixa",
+          "discriminacao": "Muito brilhante (V>0.88) e sem cor (S<0.10)"
         }
       },
       {
@@ -84,9 +86,10 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.15],
-            "v": [0.40, 0.85]
-          }
+            "s": [0.0, 0.12],
+            "v": [0.45, 0.82]
+          },
+          "discriminacao": "Cinza neutro médio - saturação muito baixa (<0.12)"
         }
       },
       {
@@ -97,9 +100,10 @@
           "brilho_lustre": "alto",
           "cor_hsv": {
             "h": [0, 360],
-            "s": [0.0, 0.18],
-            "v": [0.35, 0.90]
-          }
+            "s": [0.0, 0.14],
+            "v": [0.50, 0.88]
+          },
+          "discriminacao": "Similar a Pt mas ligeiramente mais claro"
         }
       },
       {
@@ -416,7 +420,15 @@
     "default_target": "Au",
     "priority_metals": ["Au", "Pt", "Pd", "Ag"],
     "min_particle_size": 20,
-    "confidence_threshold": 0.5
+    "confidence_threshold": 0.5,
+    "confidence_levels": {
+      "high_threshold": 0.75,
+      "medium_threshold": 0.55,
+      "low_threshold": 0.40,
+      "indeterminate_threshold": 0.30,
+      "min_score_gap_high": 0.15,
+      "min_score_gap_medium": 0.08
+    }
   },
   "export": {
     "formats": ["JSON", "CSV", "PNG", "TXT"],
@@ -426,6 +438,7 @@
     "robustez": "Parâmetros são faixas e heurísticas prontas para ajuste fino via IA.",
     "seguranca": "Evitar limpeza química agressiva; preferir ajustes ópticos para mitigar interferências.",
     "adaptacao": "Treinar com dados do seu microscópio/câmera para calibrar limiares locais.",
-    "pr14": "PR14 adicionou máscaras inteligentes, pontos brilhantes, e ferramentas de suporte automáticas."
+    "pr14": "PR14 adicionou máscaras inteligentes, pontos brilhantes, e ferramentas de suporte automáticas.",
+    "pr16": "PR16 refinou discriminação Au/PGM, adicionou controles de imagem, ROI, zoom real, e modo UV."
   }
 }
