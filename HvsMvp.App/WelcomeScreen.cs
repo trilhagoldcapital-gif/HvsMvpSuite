@@ -715,20 +715,21 @@ namespace HvsMvp.App
             }
         }
 
+        /// <summary>
+        /// PR16: Check camera availability.
+        /// Note: This is a quick optimistic check. Actual camera detection
+        /// requires async operations and is performed when entering Live mode.
+        /// Returns true to indicate camera may be available (user should verify in Live mode).
+        /// </summary>
         private bool CheckCameraStatus()
         {
-            // This is a quick check - actual camera detection would be more thorough
-            // For now, we assume camera is potentially available
-            try
-            {
-                // Check if OpenCV camera service can be instantiated
-                // This doesn't actually open the camera, just checks basic availability
-                return true; // Optimistic default - actual check would be async
-            }
-            catch
-            {
-                return false;
-            }
+            // This is a quick check that assumes camera may be available.
+            // The actual camera detection and verification happens when the user
+            // enters Live mode, where proper async camera initialization occurs.
+            // Returning true here is intentional - we don't want to block the
+            // welcome screen with slow camera detection. The actual verification
+            // happens in the MainForm when Live mode is initiated.
+            return true;
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

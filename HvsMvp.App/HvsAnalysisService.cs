@@ -175,7 +175,7 @@ namespace HvsMvp.App
             ranges.Add(new MaterialHsvRange
             {
                 Id = "Au", Name = "Ouro", Type = PixelMaterialType.Metal,
-                HMin = 35, HMax = 70, SMin = 0.25, SMax = 1.0, VMin = 0.40, VMax = 1.0,
+                HMin = 40, HMax = 65, SMin = 0.25, SMax = 1.0, VMin = 0.40, VMax = 1.0,
                 Priority = 1.0
             });
 
@@ -368,28 +368,36 @@ namespace HvsMvp.App
                 // PR16: Enhanced RGB-based checks for metals with stricter criteria
                 if (range.Type == PixelMaterialType.Metal)
                 {
+                    // Constants for gold discrimination
+                    const int GoldRgBStrictThreshold = 20;
+                    const int GoldRgBLooseThreshold = 40;
+                    const double GoldMinSaturation = 0.20;
+                    const int GoldMinBrightness = 130;
+                    const int GoldMinRgDifference = 60;
+                    const int GoldStrictRgDifference = 40;
+                    
                     // Gold: MUST have R and G dominant over B, with warm yellow/gold appearance
                     if (range.Id == "Au")
                     {
                         double avgRG = (R + G) / 2.0;
                         // PR16: Stricter check - R+G must clearly dominate B
-                        if (avgRG <= B + 20) score *= 0.15;
-                        else if (avgRG <= B + 40) score *= 0.35;
+                        if (avgRG <= B + GoldRgBStrictThreshold) score *= 0.15;
+                        else if (avgRG <= B + GoldRgBLooseThreshold) score *= 0.35;
                         
                         // R and G must be similar (gold is yellow, not orange)
                         double diffRG = Math.Abs(R - G);
-                        if (diffRG > 60) score *= 0.3;
-                        else if (diffRG > 40) score *= 0.6;
+                        if (diffRG > GoldMinRgDifference) score *= 0.3;
+                        else if (diffRG > GoldStrictRgDifference) score *= 0.6;
                         
                         // Minimum brightness for gold detection
-                        if (R < 130 && G < 130) score *= 0.25;
+                        if (R < GoldMinBrightness && G < GoldMinBrightness) score *= 0.25;
                         else if (R < 100 || G < 100) score *= 0.4;
                         
                         // PR16: Gold should NOT be too gray (must have color)
-                        if (S < 0.20) score *= 0.2;
+                        if (S < GoldMinSaturation) score *= 0.2;
                         
-                        // PR16: Additional check - gold has warm hue
-                        if (H < 30 || H > 75) score *= 0.3;
+                        // PR16: Additional check - gold has warm hue (narrower range to avoid copper)
+                        if (H < 35 || H > 70) score *= 0.3;
                     }
                     
                     // Copper: R must be significantly higher than G and B (reddish-orange)

@@ -238,6 +238,9 @@ namespace HvsMvp.App
             result.Items.Add(uvCheck);
             
             // PR16 Check: Zoom level
+            const double RecommendedZoomMin = 0.5;
+            const double RecommendedZoomMax = 4.0;
+            
             var zoomCheck = new ChecklistItem
             {
                 Id = "zoom_level",
@@ -246,9 +249,9 @@ namespace HvsMvp.App
                 IsOk = true, // Zoom is informational only
                 IsRequired = false
             };
-            if (zoomLevel < 0.5 || zoomLevel > 4.0)
+            if (zoomLevel < RecommendedZoomMin || zoomLevel > RecommendedZoomMax)
             {
-                zoomCheck.Description += " (fora do intervalo recomendado 50%-400%)";
+                zoomCheck.Description += $" (fora do intervalo recomendado {(int)(RecommendedZoomMin * 100)}%-{(int)(RecommendedZoomMax * 100)}%)";
             }
             result.Items.Add(zoomCheck);
             

@@ -55,12 +55,12 @@
         "optico": {
           "brilho_lustre": "muito alto",
           "cor_hsv": {
-            "h": [35, 70],
+            "h": [40, 65],
             "s": [0.25, 1.0],
             "v": [0.40, 1.0]
           },
           "fluorescencia_uv": "muito baixa",
-          "discriminacao": "Requer saturação mínima 0.25 e tom quente (amarelo/dourado)"
+          "discriminacao": "Requer saturação mínima 0.25 e tom quente (amarelo/dourado). Faixa H estreita para evitar confusão com cobre."
         }
       },
       {
