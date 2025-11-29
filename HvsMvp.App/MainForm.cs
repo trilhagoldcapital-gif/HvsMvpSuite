@@ -127,6 +127,25 @@ namespace HvsMvp.App
         private SessionLoggerService? _sessionLogger;
         private PreOperationChecklistService? _checklistService;
         private ConfigurationBackupService? _backupService;
+        
+        // PR16: New services for enhanced functionality
+        private UvModeService _uvModeService = new UvModeService();
+        private RoiService _roiService = new RoiService();
+        private ImageControlPanel? _imageControlPanel;
+        private ZoomPanControl? _zoomPanControl;
+        private ZoomToolbar? _zoomToolbar;
+        private RoiSelectionOverlay? _roiOverlay;
+        
+        // PR16: UV mode button
+        private Button _btnUvMode = null!;
+        
+        // PR16: ROI buttons
+        private Button _btnRoiRect = null!;
+        private Button _btnRoiClear = null!;
+        
+        // PR16: Image control panel toggle
+        private Button _btnImageControls = null!;
+        private Panel _imageControlsContainer = null!;
 
         // Quality checklist panel
         private QualityChecklistPanel _qualityPanel = null!;
@@ -627,6 +646,28 @@ namespace HvsMvp.App
             _btnQaPanel.Click += BtnQaPanel_Click;
             _toolbarRow2.Controls.Add(_btnQaPanel);
 
+            _toolbarRow2.Controls.Add(ToolbarSeparator());
+            _toolbarRow2.Controls.Add(ToolbarLabel("PR16:"));
+
+            // PR16: UV Mode button
+            _btnUvMode = ToolbarBtn("🔮 UV", "Ativar/desativar modo UV");
+            _btnUvMode.Click += BtnUvMode_Click;
+            _toolbarRow2.Controls.Add(_btnUvMode);
+
+            // PR16: ROI buttons
+            _btnRoiRect = ToolbarBtn("⬜ ROI", "Definir região de interesse (amostra)");
+            _btnRoiRect.Click += BtnRoiRect_Click;
+            _toolbarRow2.Controls.Add(_btnRoiRect);
+
+            _btnRoiClear = ToolbarBtn("❌ ROI", "Limpar ROI", minWidth: 36);
+            _btnRoiClear.Click += BtnRoiClear_Click;
+            _toolbarRow2.Controls.Add(_btnRoiClear);
+
+            // PR16: Image controls toggle
+            _btnImageControls = ToolbarBtn("🎚️ Imag", "Controles de imagem (brilho/contraste)");
+            _btnImageControls.Click += BtnImageControls_Click;
+            _toolbarRow2.Controls.Add(_btnImageControls);
+
             // PR12: Toolbar Row 3 - Export and System
             var toolbar3 = new Panel
             {
@@ -781,19 +822,80 @@ namespace HvsMvp.App
             // PR12: For compatibility with old code
             _cameraMaterialsSplit = _contentVerticalSplit;
 
+            // PR16: Enhanced image panel with zoom/pan support and image controls
+            var imagePanelContainer = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                BackColor = Color.Black
+            };
+            imagePanelContainer.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); // Zoom toolbar
+            imagePanelContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Image area
+            imagePanelContainer.RowStyles.Add(new RowStyle(SizeType.Absolute, 0)); // Image controls (hidden by default)
+            _cameraMaterialsSplit.Panel1.Controls.Add(imagePanelContainer);
+
+            // PR16: Create ZoomPanControl for real zoom and pan
+            _zoomPanControl = new ZoomPanControl
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Black
+            };
+            _zoomPanControl.ZoomChanged += ZoomPanControl_ZoomChanged;
+            _zoomPanControl.PixelClicked += ZoomPanControl_PixelClicked;
+
+            // PR16: Create zoom toolbar
+            _zoomToolbar = new ZoomToolbar(_zoomPanControl);
+            _zoomToolbar.Dock = DockStyle.Fill;
+            imagePanelContainer.Controls.Add(_zoomToolbar, 0, 0);
+
+            // PR16: Image panel with zoom control
             _imagePanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.Black,
-                Padding = new Padding(8),
-                AutoScroll = true
+                Padding = new Padding(0)
             };
-            _cameraMaterialsSplit.Panel1.Controls.Add(_imagePanel);
+            imagePanelContainer.Controls.Add(_imagePanel, 0, 1);
 
+            // Add ZoomPanControl to image panel
+            _imagePanel.Controls.Add(_zoomPanControl);
+
+            // PR16: ROI selection overlay (transparent, on top of zoom control)
+            _roiOverlay = new RoiSelectionOverlay(_roiService)
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent
+            };
+            _roiOverlay.RoiChanged += RoiOverlay_RoiChanged;
+            _imagePanel.Controls.Add(_roiOverlay);
+            _roiOverlay.BringToFront();
+
+            // PR16: Image controls container (collapsible)
+            _imageControlsContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(12, 22, 38),
+                Visible = false,
+                Height = 180
+            };
+            imagePanelContainer.Controls.Add(_imageControlsContainer, 0, 2);
+
+            // PR16: Image control panel
+            _imageControlPanel = new ImageControlPanel
+            {
+                Dock = DockStyle.Fill
+            };
+            _imageControlPanel.AdjustmentChanged += ImageControlPanel_AdjustmentChanged;
+            _imageControlPanel.ApplyRequested += ImageControlPanel_ApplyRequested;
+            _imageControlsContainer.Controls.Add(_imageControlPanel);
+
+            // Legacy PictureBox for compatibility (hidden, used for some operations)
             _pictureSample = new PictureBox
             {
                 BackColor = Color.Black,
-                SizeMode = PictureBoxSizeMode.Normal
+                SizeMode = PictureBoxSizeMode.Normal,
+                Visible = false
             };
             _imagePanel.Controls.Add(_pictureSample);
             _pictureSample.MouseMove += PictureSample_MouseMove;
@@ -1877,7 +1979,8 @@ namespace HvsMvp.App
                 {
                     AppendLog("Executando análise no frame congelado...");
                     using var bmp = new Bitmap(_pictureSample.Image);
-                    _lastScene = _analysisService.AnalyzeScene(bmp, null);
+                    // PR16: Pass ROI to analysis for sample/background separation
+                    _lastScene = _analysisService.AnalyzeScene(bmp, null, _roiService.CurrentRoi);
                     _lastBaseImageClone?.Dispose();
                     _lastBaseImageClone = (Bitmap)bmp.Clone();
                     UpdateMaterialListsFromScene();
@@ -2054,8 +2157,8 @@ namespace HvsMvp.App
 
                 using var bmp = new Bitmap(_pictureSample.Image);
 
-                // Usar AnalyzeScene para obter a cena completa com Labels
-                var scene = _analysisService.AnalyzeScene(bmp, imagePath: null);
+                // PR16: Usar AnalyzeScene com ROI para separação amostra/fundo
+                var scene = _analysisService.AnalyzeScene(bmp, imagePath: null, _roiService.CurrentRoi);
                 
                 // Se QualityStatus for Invalid, executar reanálise automática
                 if (string.Equals(scene.Summary.QualityStatus, "Invalid", StringComparison.OrdinalIgnoreCase))
@@ -2230,7 +2333,8 @@ namespace HvsMvp.App
                     {
                         AppendLog("Executando análise antes da análise seletiva...");
                         using var bmp = new Bitmap(_pictureSample.Image);
-                        var scene = _analysisService.AnalyzeScene(bmp, null);
+                        // PR16: Pass ROI to analysis
+                        var scene = _analysisService.AnalyzeScene(bmp, null, _roiService.CurrentRoi);
                         _lastScene = scene;
                         _lastBaseImageClone?.Dispose();
                         _lastBaseImageClone = (Bitmap)bmp.Clone();
@@ -2917,6 +3021,13 @@ namespace HvsMvp.App
         {
             if (_pictureSample.Image == null) return;
 
+            // PR16: Update ZoomPanControl if available
+            if (_zoomPanControl != null)
+            {
+                _zoomPanControl.Image = (Bitmap)_pictureSample.Image;
+            }
+
+            // Legacy zoom support for compatibility
             var img = _pictureSample.Image;
             int newW = (int)(img.Width * _zoomFactor);
             int newH = (int)(img.Height * _zoomFactor);
@@ -3387,7 +3498,8 @@ namespace HvsMvp.App
                 }
 
                 using var bmp = new Bitmap(_pictureSample.Image);
-                var scene = _analysisService.AnalyzeScene(bmp, imagePath: null);
+                // PR16: Pass ROI to analysis
+                var scene = _analysisService.AnalyzeScene(bmp, imagePath: null, _roiService.CurrentRoi);
 
                 string alvo = (_cbTarget?.SelectedItem?.ToString() ?? "SemAlvo").Replace(':', '_').Replace(' ', '_');
                 string baseDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "datasets", "hvs-calibration", alvo);
@@ -3793,9 +3905,10 @@ namespace HvsMvp.App
             _frameFrozen = false;
 
             // PR7 - Fase 1: Usar construtor com FullSceneAnalysis para suportar análise seletiva em modo contínuo
+            // PR16: Pass ROI to analysis
             _continuousController = new ContinuousAnalysisController(
                 frameProvider: () => SafeGetCurrentFrameClone(),
-                sceneAnalyzer: bmp => _analysisService.AnalyzeScene(bmp, null),
+                sceneAnalyzer: bmp => _analysisService.AnalyzeScene(bmp, null, _roiService.CurrentRoi),
                 intervalMs: 800);
 
             _continuousController.SceneAnalysisCompleted += OnContinuousSceneAnalysis;
@@ -4477,6 +4590,279 @@ namespace HvsMvp.App
             catch (Exception ex)
             {
                 AppendLog($"Erro ao exportar logs: {ex.Message}");
+            }
+        }
+        
+        #endregion
+        
+        #region PR16: Enhanced Features - UV Mode, ROI, Zoom, Image Controls
+        
+        /// <summary>
+        /// PR16: Handle UV mode button click.
+        /// </summary>
+        private void BtnUvMode_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                _uvModeService.ToggleUvMode();
+                
+                bool isActive = _uvModeService.IsUvModeActive;
+                _btnUvMode.BackColor = isActive 
+                    ? Color.FromArgb(100, 60, 120) 
+                    : Color.FromArgb(30, 50, 70);
+                _btnUvMode.Text = isActive ? "🔮 UV ✓" : "🔮 UV";
+                
+                AppendLog($"Modo UV: {_uvModeService.GetStatusText()}");
+                
+                // Apply UV visualization if we have an image
+                RefreshCurrentView();
+                
+                // Log UV mode change for session
+                _sessionLogger?.LogEvent("UV_MODE_CHANGED", new Dictionary<string, object>
+                {
+                    ["IsActive"] = isActive,
+                    ["Mode"] = _uvModeService.CurrentMode.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao alternar modo UV: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle ROI rectangle button click.
+        /// </summary>
+        private void BtnRoiRect_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_roiOverlay == null) return;
+                
+                _roiOverlay.StartRectangleSelection();
+                AppendLog("Selecione a região de interesse (ROI) arrastando o mouse.");
+                _btnRoiRect.BackColor = Color.FromArgb(80, 100, 60);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao iniciar seleção ROI: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle ROI clear button click.
+        /// </summary>
+        private void BtnRoiClear_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                _roiService.ClearRoi();
+                _roiOverlay?.ClearRoi();
+                _btnRoiRect.BackColor = Color.FromArgb(30, 50, 70);
+                AppendLog("ROI removida. A imagem completa será analisada.");
+                
+                RefreshCurrentView();
+                
+                _sessionLogger?.LogEvent("ROI_CLEARED", null);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao limpar ROI: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle ROI changed event.
+        /// </summary>
+        private void RoiOverlay_RoiChanged(object? sender, EventArgs e)
+        {
+            try
+            {
+                _btnRoiRect.BackColor = _roiService.HasRoi
+                    ? Color.FromArgb(60, 100, 80)
+                    : Color.FromArgb(30, 50, 70);
+                    
+                string status = _roiService.GetRoiStatusText();
+                AppendLog(status);
+                
+                RefreshCurrentView();
+                
+                _sessionLogger?.LogEvent("ROI_DEFINED", new Dictionary<string, object>
+                {
+                    ["HasRoi"] = _roiService.HasRoi,
+                    ["Shape"] = _roiService.CurrentRoi?.Shape.ToString() ?? "None"
+                });
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao processar ROI: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle image controls button click.
+        /// </summary>
+        private void BtnImageControls_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (_imageControlsContainer == null) return;
+                
+                bool isVisible = !_imageControlsContainer.Visible;
+                _imageControlsContainer.Visible = isVisible;
+                
+                // Update the row height in the parent TableLayoutPanel
+                if (_imageControlsContainer.Parent is TableLayoutPanel tbl)
+                {
+                    tbl.RowStyles[2] = new RowStyle(SizeType.Absolute, isVisible ? 180 : 0);
+                }
+                
+                _btnImageControls.BackColor = isVisible
+                    ? Color.FromArgb(60, 80, 100)
+                    : Color.FromArgb(30, 50, 70);
+                    
+                AppendLog(isVisible ? "Painel de controles de imagem aberto." : "Painel de controles de imagem fechado.");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao alternar controles de imagem: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle image adjustment changes.
+        /// </summary>
+        private void ImageControlPanel_AdjustmentChanged(object? sender, ImageAdjustmentEventArgs e)
+        {
+            try
+            {
+                RefreshCurrentView();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao aplicar ajustes de imagem: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle image adjustment apply request.
+        /// </summary>
+        private void ImageControlPanel_ApplyRequested(object? sender, EventArgs e)
+        {
+            try
+            {
+                AppendLog($"Ajustes de imagem aplicados: B={_imageControlPanel?.Brightness:F2}, C={_imageControlPanel?.Contrast:F2}, G={_imageControlPanel?.Gamma:F2}, S={_imageControlPanel?.Saturation:F2}");
+                RefreshCurrentView();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao aplicar ajustes: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle zoom changes.
+        /// </summary>
+        private void ZoomPanControl_ZoomChanged(object? sender, EventArgs e)
+        {
+            // Update zoom factor for compatibility
+            if (_zoomPanControl != null)
+            {
+                _zoomFactor = _zoomPanControl.ZoomLevel;
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Handle pixel clicks on the image (right-click).
+        /// </summary>
+        private void ZoomPanControl_PixelClicked(object? sender, Point imagePoint)
+        {
+            try
+            {
+                if (_lastScene?.Labels == null) return;
+                
+                int x = imagePoint.X;
+                int y = imagePoint.Y;
+                
+                if (x < 0 || y < 0 || x >= _lastScene.Width || y >= _lastScene.Height)
+                    return;
+                
+                var lbl = _lastScene.Labels[x, y];
+                if (lbl == null) return;
+                
+                string info = $"Pixel ({x}, {y}): ";
+                if (lbl.IsSample)
+                {
+                    info += $"Material={lbl.MaterialId ?? "?"}, Confiança={lbl.MaterialConfidence:P1}";
+                    info += $", H={lbl.H:F0}° S={lbl.S:F2} V={lbl.V:F2}";
+                }
+                else
+                {
+                    info += "Fundo";
+                }
+                
+                AppendLog(info);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao inspecionar pixel: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR16: Refresh the current view with all applied effects (UV, ROI, image adjustments).
+        /// </summary>
+        private void RefreshCurrentView()
+        {
+            try
+            {
+                if (_lastBaseImageClone == null) return;
+                
+                // Start with the base image
+                Bitmap displayImage = (Bitmap)_lastBaseImageClone.Clone();
+                
+                // Apply image adjustments if panel is active
+                if (_imageControlPanel != null && 
+                    (Math.Abs(_imageControlPanel.Brightness) > 0.01 ||
+                     Math.Abs(_imageControlPanel.Contrast) > 0.01 ||
+                     Math.Abs(_imageControlPanel.Gamma - 1.0) > 0.01 ||
+                     Math.Abs(_imageControlPanel.Saturation) > 0.01))
+                {
+                    var adjusted = _imageControlPanel.ApplyAdjustments(displayImage);
+                    displayImage.Dispose();
+                    displayImage = adjusted;
+                }
+                
+                // Apply UV visualization if active
+                if (_uvModeService.IsUvModeActive)
+                {
+                    var uvImage = _uvModeService.ApplyUvVisualization(displayImage);
+                    displayImage.Dispose();
+                    displayImage = uvImage;
+                }
+                
+                // Apply ROI overlay if defined
+                if (_roiService.HasRoi)
+                {
+                    var roiImage = _roiService.DrawRoiOverlay(displayImage, Color.FromArgb(100, 200, 255));
+                    displayImage.Dispose();
+                    displayImage = roiImage;
+                }
+                
+                // Update the display
+                if (_zoomPanControl != null)
+                {
+                    _zoomPanControl.UpdateImage(displayImage);
+                }
+                
+                // Also update legacy PictureBox for compatibility
+                var oldImage = _pictureSample.Image;
+                _pictureSample.Image = displayImage;
+                oldImage?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao atualizar visualização: {ex.Message}");
             }
         }
         

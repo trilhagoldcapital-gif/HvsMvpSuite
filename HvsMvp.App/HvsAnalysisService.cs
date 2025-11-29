@@ -596,7 +596,10 @@ namespace HvsMvp.App
             return r1;
         }
 
-        public FullSceneAnalysis AnalyzeScene(Bitmap bmp, string? imagePath)
+        /// <summary>
+        /// PR16: Analyze scene with optional ROI support for sample/background separation.
+        /// </summary>
+        public FullSceneAnalysis AnalyzeScene(Bitmap bmp, string? imagePath, RoiDefinition? roi = null)
         {
             using var src24 = Ensure24bpp(bmp);
 
@@ -606,11 +609,20 @@ namespace HvsMvp.App
             int w = src24.Width, h = src24.Height;
             var mask = new SampleMaskClass[w, h];
             long sampleCount = 0;
+            
+            // PR16: Apply ROI to mask - pixels outside ROI are marked as background
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
                     bool isSample = maskNullable[x, y]?.IsSample == true;
+                    
+                    // PR16: If ROI is defined, further restrict sample area to within ROI
+                    if (isSample && roi != null && roi.Shape != RoiShape.None)
+                    {
+                        isSample = roi.Contains(x, y);
+                    }
+                    
                     mask[x, y] = new SampleMaskClass { IsSample = isSample };
                     if (isSample) sampleCount++;
                 }
