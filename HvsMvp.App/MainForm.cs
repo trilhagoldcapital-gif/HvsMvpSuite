@@ -17,6 +17,10 @@ namespace HvsMvp.App
         private const int ActiveBorderSize = 2;
         private const int NormalBorderSize = 1;
         
+        // Camera constants
+        private const int MaxValidCameraIndex = 7;
+        private const int FrameLogInterval = 10; // Log every N frames for diagnostics
+        
         private HvsConfig? _config;
         private HvsAnalysisService? _analysisService;
         private AppSettings _appSettings = null!;
@@ -160,6 +164,7 @@ namespace HvsMvp.App
         private int _cameraIndex = 1;
         private int _cameraWidth = 1920;
         private int _cameraHeight = 1080;
+        private int _frameLogCounter; // Counter for throttled frame logging
 
         // PR17: Idioma - use centralized LocalizationService
         private string _currentLocale = "pt-BR";
@@ -267,10 +272,10 @@ namespace HvsMvp.App
             // Apply settings to camera
             _cameraIndex = _appSettings.DefaultCameraIndex;
             
-            // Safer default camera index: clamp to valid range [0, 7]
+            // Safer default camera index: clamp to valid range [0, MaxValidCameraIndex]
             // Many systems expose the primary webcam at index 0
             bool cameraIndexAdjusted = false;
-            if (_cameraIndex < 0 || _cameraIndex > 7)
+            if (_cameraIndex < 0 || _cameraIndex > MaxValidCameraIndex)
             {
                 _cameraIndex = 0;
                 cameraIndexAdjusted = true;
@@ -1694,8 +1699,13 @@ namespace HvsMvp.App
                 {
                     try
                     {
-                        // Frame diagnostics: Log frame size to confirm frames are arriving
-                        AppendLog($"Frame recebido: {frame.Width}x{frame.Height}");
+                        // Frame diagnostics: Log frame size to confirm frames are arriving (throttled)
+                        _frameLogCounter++;
+                        if (_frameLogCounter >= FrameLogInterval)
+                        {
+                            _frameLogCounter = 0;
+                            AppendLog($"Frame recebido: {frame.Width}x{frame.Height}");
+                        }
 
                         // PR18: Update PictureBox (for analysis compatibility)
                         var oldPicture = _pictureSample.Image;
