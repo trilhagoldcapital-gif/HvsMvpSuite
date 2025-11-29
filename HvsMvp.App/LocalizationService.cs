@@ -254,7 +254,28 @@ namespace HvsMvp.App
                 ["confidence.high"] = "Alta (72-85%)",
                 ["confidence.medium"] = "Média (52-72%)",
                 ["confidence.low"] = "Baixa (38-52%)",
-                ["confidence.indeterminate"] = "Indeterminado (< 38%)"
+                ["confidence.indeterminate"] = "Indeterminado (< 38%)",
+                
+                // Report labels
+                ["report.gold.indicator"] = "🥇 INDICADOR DE OURO (Au)",
+                ["report.gold.score"] = "Score: {0:F3} | Confiança: {1}",
+                ["report.gold.fraction"] = "Fração: {0:P4} | PPM: {1}",
+                ["report.gold.high.confidence"] = "✅ Detecção de ALTA CONFIANÇA - Ouro identificado com segurança",
+                ["report.gold.medium.confidence"] = "⚠️ Detecção de MÉDIA CONFIANÇA - Provável ouro, confirmar com análise adicional",
+                ["report.gold.low.confidence"] = "⚠️ Detecção de BAIXA CONFIANÇA - Possível ouro, recomenda-se verificação",
+                ["report.gold.indeterminate"] = "❌ Detecção INDETERMINADA - Não foi possível confirmar ouro nesta análise",
+                ["report.metals.detected"] = "METAIS DETECTADOS",
+                ["report.table.metal"] = "Metal",
+                ["report.table.score"] = "Score",
+                ["report.table.confidence"] = "Confiança",
+                ["report.table.sample.pct"] = "% Amostra",
+                ["report.table.ppm"] = "PPM",
+                ["report.table.group"] = "Grupo",
+                ["report.confidence.very.high"] = "Muito Alta",
+                ["report.confidence.high"] = "Alta",
+                ["report.confidence.medium"] = "Média",
+                ["report.confidence.low"] = "Baixa",
+                ["report.confidence.indet"] = "Indet."
             };
         }
         
@@ -389,7 +410,28 @@ namespace HvsMvp.App
                 ["confidence.high"] = "High (72-85%)",
                 ["confidence.medium"] = "Medium (52-72%)",
                 ["confidence.low"] = "Low (38-52%)",
-                ["confidence.indeterminate"] = "Indeterminate (< 38%)"
+                ["confidence.indeterminate"] = "Indeterminate (< 38%)",
+                
+                // Report labels
+                ["report.gold.indicator"] = "🥇 GOLD INDICATOR (Au)",
+                ["report.gold.score"] = "Score: {0:F3} | Confidence: {1}",
+                ["report.gold.fraction"] = "Fraction: {0:P4} | PPM: {1}",
+                ["report.gold.high.confidence"] = "✅ HIGH CONFIDENCE Detection - Gold identified reliably",
+                ["report.gold.medium.confidence"] = "⚠️ MEDIUM CONFIDENCE Detection - Likely gold, confirm with additional analysis",
+                ["report.gold.low.confidence"] = "⚠️ LOW CONFIDENCE Detection - Possible gold, verification recommended",
+                ["report.gold.indeterminate"] = "❌ INDETERMINATE Detection - Could not confirm gold in this analysis",
+                ["report.metals.detected"] = "METALS DETECTED",
+                ["report.table.metal"] = "Metal",
+                ["report.table.score"] = "Score",
+                ["report.table.confidence"] = "Confidence",
+                ["report.table.sample.pct"] = "% Sample",
+                ["report.table.ppm"] = "PPM",
+                ["report.table.group"] = "Group",
+                ["report.confidence.very.high"] = "Very High",
+                ["report.confidence.high"] = "High",
+                ["report.confidence.medium"] = "Medium",
+                ["report.confidence.low"] = "Low",
+                ["report.confidence.indet"] = "Indet."
             };
         }
         

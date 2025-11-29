@@ -164,163 +164,55 @@ namespace HvsMvp.App
         // PR17: Idioma - use centralized LocalizationService
         private string _currentLocale = "pt-BR";
         
-        // Legacy i18n dictionary for backward compatibility
-        // PR17: This is now backed by LocalizationService for complete translations
-        private Dictionary<string, Dictionary<string, string>> _i18n =>
-            new()
+        // PR17: Helper to get localized string (uses LocalizationService)
+        private string L(string key) => LocalizationService.Instance.Get(key);
+        
+        // Legacy _i18n accessor - delegates to LocalizationService for consistent translations
+        // This property exists for backward compatibility with code that accesses _i18n[locale][key]
+        private Dictionary<string, string> GetCurrentLocaleStrings()
+        {
+            return new Dictionary<string, string>
             {
-                ["pt-BR"] = new()
-                {
-                    ["title"] = LocalizationService.Instance.Get("title"),
-                    ["metals"] = LocalizationService.Instance.Get("metals"),
-                    ["crystals"] = LocalizationService.Instance.Get("crystals"),
-                    ["gems"] = LocalizationService.Instance.Get("gems"),
-                    ["status.ready"] = LocalizationService.Instance.Get("status.ready"),
-                    ["btn.open"] = LocalizationService.Instance.Get("btn.open"),
-                    ["btn.live"] = LocalizationService.Instance.Get("btn.live"),
-                    ["btn.stop"] = LocalizationService.Instance.Get("btn.stop"),
-                    ["btn.analyze"] = LocalizationService.Instance.Get("btn.analyze"),
-                    ["btn.cont"] = LocalizationService.Instance.Get("btn.cont"),
-                    ["btn.cont.stop"] = LocalizationService.Instance.Get("btn.cont.stop"),
-                    ["btn.mask"] = LocalizationService.Instance.Get("btn.mask"),
-                    ["btn.mask.bg"] = LocalizationService.Instance.Get("btn.mask.bg"),
-                    ["btn.phase.map"] = LocalizationService.Instance.Get("btn.phase.map"),
-                    ["btn.heatmap"] = LocalizationService.Instance.Get("btn.heatmap"),
-                    ["btn.training"] = LocalizationService.Instance.Get("btn.training"),
-                    ["btn.ai"] = LocalizationService.Instance.Get("btn.ai"),
-                    ["btn.zoom.in"] = LocalizationService.Instance.Get("btn.zoom.in"),
-                    ["btn.zoom.out"] = LocalizationService.Instance.Get("btn.zoom.out"),
-                    ["btn.wb"] = LocalizationService.Instance.Get("btn.wb"),
-                    ["btn.scale"] = LocalizationService.Instance.Get("btn.scale"),
-                    ["btn.camera"] = LocalizationService.Instance.Get("btn.camera"),
-                    ["btn.res"] = LocalizationService.Instance.Get("btn.res"),
-                    ["btn.txt"] = LocalizationService.Instance.Get("btn.txt"),
-                    ["btn.pdf"] = LocalizationService.Instance.Get("btn.pdf"),
-                    ["btn.json"] = LocalizationService.Instance.Get("btn.json"),
-                    ["btn.csv"] = LocalizationService.Instance.Get("btn.csv"),
-                    ["btn.bi.csv"] = LocalizationService.Instance.Get("btn.bi.csv"),
-                    ["btn.export.ia"] = LocalizationService.Instance.Get("btn.export.ia"),
-                    ["btn.qa.panel"] = LocalizationService.Instance.Get("btn.qa.panel"),
-                    ["btn.debug"] = LocalizationService.Instance.Get("btn.debug"),
-                    ["btn.calib"] = LocalizationService.Instance.Get("btn.calib"),
-                    ["label.target"] = LocalizationService.Instance.Get("label.target")
-                },
-                ["en-US"] = new()
-                {
-                    ["title"] = "TGC Metal Analytics · HVS-MVP",
-                    ["metals"] = "Metals",
-                    ["crystals"] = "Crystals",
-                    ["gems"] = "Gems",
-                    ["status.ready"] = "Ready · HVS-MVP loaded",
-                    ["btn.open"] = "📂 Open image",
-                    ["btn.live"] = "▶ Live",
-                    ["btn.stop"] = "⏹ Stop",
-                    ["btn.analyze"] = "🧪 Analyze",
-                    ["btn.cont"] = "⚙ Continuous",
-                    ["btn.cont.stop"] = "⏸ Stop continuous",
-                    ["btn.mask"] = "🎨 Mask",
-                    ["btn.mask.bg"] = "🖼 Background masked",
-                    ["btn.phase.map"] = "🗺 Phase Map",
-                    ["btn.heatmap"] = "🔥 Target Heatmap",
-                    ["btn.training"] = "🎯 Training Mode",
-                    ["btn.ai"] = "🔬 Particles / AI Dataset",
-                    ["btn.zoom.in"] = "🔍 Zoom +",
-                    ["btn.zoom.out"] = "🔎 Zoom -",
-                    ["btn.wb"] = "⚪ White balance",
-                    ["btn.scale"] = "📏 Scale",
-                    ["btn.camera"] = "🎥 Camera...",
-                    ["btn.res"] = "⚙️ Resolution...",
-                    ["btn.txt"] = "📝 TXT Report",
-                    ["btn.pdf"] = "📄 PDF Report",
-                    ["btn.json"] = "{} JSON",
-                    ["btn.csv"] = "📊 CSV",
-                    ["btn.bi.csv"] = "📈 BI CSV",
-                    ["btn.export.ia"] = "🤖 AI Dataset",
-                    ["btn.qa.panel"] = "✅ QA Particles",
-                    ["btn.debug"] = "🛠 HVS Debug",
-                    ["btn.calib"] = "📸 Calibrate (auto)",
-                    ["label.target"] = "Target:"
-                },
-                ["es-ES"] = new()
-                {
-                    ["title"] = "TGC Análisis de Metales · HVS-MVP",
-                    ["metals"] = "Metales",
-                    ["crystals"] = "Cristales",
-                    ["gems"] = "Gemas",
-                    ["status.ready"] = "Listo · HVS-MVP cargado",
-                    ["btn.open"] = "📂 Abrir imagen",
-                    ["btn.live"] = "▶ En vivo",
-                    ["btn.stop"] = "⏹ Detener",
-                    ["btn.analyze"] = "🧪 Analizar",
-                    ["btn.cont"] = "⚙ Continuo",
-                    ["btn.cont.stop"] = "⏸ Detener continuo",
-                    ["btn.mask"] = "🎨 Máscara",
-                    ["btn.mask.bg"] = "🖼 Fondo enmascarado",
-                    ["btn.phase.map"] = "🗺 Mapa de Fases",
-                    ["btn.heatmap"] = "🔥 Mapa de calor",
-                    ["btn.training"] = "🎯 Modo Entrenamiento",
-                    ["btn.ai"] = "🔬 Partículas / Dataset IA",
-                    ["btn.zoom.in"] = "🔍 Zoom +",
-                    ["btn.zoom.out"] = "🔎 Zoom -",
-                    ["btn.wb"] = "⚪ Balance de blancos",
-                    ["btn.scale"] = "📏 Escala",
-                    ["btn.camera"] = "🎥 Cámara...",
-                    ["btn.res"] = "⚙️ Resolución...",
-                    ["btn.txt"] = "📝 Informe TXT",
-                    ["btn.pdf"] = "📄 Informe PDF",
-                    ["btn.json"] = "{} JSON",
-                    ["btn.csv"] = "📊 CSV",
-                    ["btn.bi.csv"] = "📈 BI CSV",
-                    ["btn.export.ia"] = "🤖 Dataset IA",
-                    ["btn.qa.panel"] = "✅ QA Partículas",
-                    ["btn.debug"] = "🛠 Debug HVS",
-                    ["btn.calib"] = "📸 Calibrar (auto)",
-                    ["label.target"] = "Objetivo:"
-                },
-                ["fr-FR"] = new()
-                {
-                    ["title"] = "TGC Analyse des Métaux · HVS-MVP",
-                    ["metals"] = "Métaux",
-                    ["crystals"] = "Cristaux",
-                    ["gems"] = "Gemmes",
-                    ["status.ready"] = "Prêt · HVS-MVP chargé",
-                    ["btn.open"] = "📂 Ouvrir image",
-                    ["btn.live"] = "▶ En direct",
-                    ["btn.stop"] = "⏹ Arrêter",
-                    ["btn.analyze"] = "🧪 Analyser",
-                    ["btn.cont"] = "⚙ Continu",
-                    ["btn.cont.stop"] = "⏸ Arrêter continu",
-                    ["btn.mask"] = "🎨 Masque",
-                    ["btn.mask.bg"] = "🖼 Fond masqué",
-                    ["label.target"] = "Cible:"
-                },
-                ["ar"] = new()
-                {
-                    ["title"] = "TGC تحليل المعادن · HVS-MVP",
-                    ["metals"] = "المعادن",
-                    ["crystals"] = "البلورات",
-                    ["gems"] = "الأحجار الكريمة",
-                    ["status.ready"] = "جاهز · HVS-MVP محمل",
-                    ["btn.open"] = "📂 فتح صورة",
-                    ["btn.live"] = "▶ مباشر",
-                    ["btn.stop"] = "⏹ إيقاف",
-                    ["btn.analyze"] = "🧪 تحليل",
-                    ["label.target"] = "الهدف:"
-                },
-                ["zh-CN"] = new()
-                {
-                    ["title"] = "TGC 金属分析 · HVS-MVP",
-                    ["metals"] = "金属",
-                    ["crystals"] = "晶体",
-                    ["gems"] = "宝石",
-                    ["status.ready"] = "就绪 · HVS-MVP 已加载",
-                    ["btn.open"] = "📂 打开图像",
-                    ["btn.live"] = "▶ 实时",
-                    ["btn.stop"] = "⏹ 停止",
-                    ["btn.analyze"] = "🧪 分析",
-                    ["label.target"] = "目标:"
-                }
+                ["title"] = L("title"),
+                ["metals"] = L("metals"),
+                ["crystals"] = L("crystals"),
+                ["gems"] = L("gems"),
+                ["status.ready"] = L("status.ready"),
+                ["btn.open"] = L("btn.open"),
+                ["btn.live"] = L("btn.live"),
+                ["btn.stop"] = L("btn.stop"),
+                ["btn.analyze"] = L("btn.analyze"),
+                ["btn.cont"] = L("btn.cont"),
+                ["btn.cont.stop"] = L("btn.cont.stop"),
+                ["btn.mask"] = L("btn.mask"),
+                ["btn.mask.bg"] = L("btn.mask.bg"),
+                ["btn.phase.map"] = L("btn.phase.map"),
+                ["btn.heatmap"] = L("btn.heatmap"),
+                ["btn.training"] = L("btn.training"),
+                ["btn.ai"] = L("btn.ai"),
+                ["btn.zoom.in"] = L("btn.zoom.in"),
+                ["btn.zoom.out"] = L("btn.zoom.out"),
+                ["btn.wb"] = L("btn.wb"),
+                ["btn.scale"] = L("btn.scale"),
+                ["btn.camera"] = L("btn.camera"),
+                ["btn.res"] = L("btn.res"),
+                ["btn.txt"] = L("btn.txt"),
+                ["btn.pdf"] = L("btn.pdf"),
+                ["btn.json"] = L("btn.json"),
+                ["btn.csv"] = L("btn.csv"),
+                ["btn.bi.csv"] = L("btn.bi.csv"),
+                ["btn.export.ia"] = L("btn.export.ia"),
+                ["btn.qa.panel"] = L("btn.qa.panel"),
+                ["btn.debug"] = L("btn.debug"),
+                ["btn.calib"] = L("btn.calib"),
+                ["label.target"] = L("label.target")
             };
+        }
+        
+        // PR17: Legacy _i18n accessor for backward compatibility
+        // Always returns current locale strings from LocalizationService
+        private Dictionary<string, Dictionary<string, string>> _i18n => 
+            new() { [_currentLocale] = GetCurrentLocaleStrings() };
 
         // Zoom
         private float _zoomFactor = 1.0f;
