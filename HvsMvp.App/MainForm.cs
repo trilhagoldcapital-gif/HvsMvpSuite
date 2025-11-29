@@ -122,6 +122,11 @@ namespace HvsMvp.App
         
         // PR14: Intelligent bright points mask service
         private BrightPointsMaskService _brightPointsMaskService = new BrightPointsMaskService();
+        
+        // PR15: Session logging and checklist services
+        private SessionLoggerService? _sessionLogger;
+        private PreOperationChecklistService? _checklistService;
+        private ConfigurationBackupService? _backupService;
 
         // Quality checklist panel
         private QualityChecklistPanel _qualityPanel = null!;
@@ -256,6 +261,15 @@ namespace HvsMvp.App
             _reportService = new ReportService(_appSettings);
             _biExportService = new BiExportService(_appSettings);
             _iaDatasetService = new IaDatasetService(_appSettings);
+            
+            // PR15: Initialize hardening services
+            _backupService = new ConfigurationBackupService(_appSettings);
+            
+            // PR15: Initialize session logging if enabled
+            if (_appSettings.EnableSessionLogging)
+            {
+                _sessionLogger = new SessionLoggerService(_appSettings);
+            }
 
             // Apply settings to camera
             _cameraIndex = _appSettings.DefaultCameraIndex;
@@ -263,9 +277,16 @@ namespace HvsMvp.App
             _cameraHeight = _appSettings.GetResolutionHeight();
 
             LoadHvsConfig();
+            
+            // PR15: Initialize checklist service after config is loaded
+            _checklistService = new PreOperationChecklistService(_appSettings, _config);
+            
             InitializeLayout();
             InitializeCameraEvents();
             PopulateMaterials();
+            
+            // PR15: Apply operation profile to UI
+            ApplyOperationProfile(_appSettings.CurrentProfile);
 
             FormClosing += MainForm_FormClosing;
 
@@ -1079,7 +1100,7 @@ namespace HvsMvp.App
             menuAnalise.DropDownItems.Add(CreateMenuItem("⚙️ Análise contínua", "Ctrl+F9", (s, e) => BtnContinuous_Click(s, e)));
             menuAnalise.DropDownItems.Add(CreateMenuItem("⏸️ Parar contínua", null, (s, e) => BtnStopContinuous_Click(s, e)));
             menuAnalise.DropDownItems.Add(new ToolStripSeparator());
-            menuAnalise.DropDownItems.Add(CreateMenuItem("🎯 Análise seletiva", "F10", (s, e) => BtnSelectiveAnalyze_Click(s, e)));
+            menuAnalise.DropDownItems.Add(CreateMenuItem("🎯 Análise seletiva", "F2/F10", (s, e) => BtnSelectiveAnalyze_Click(s, e)));
             menuAnalise.DropDownItems.Add(new ToolStripSeparator());
             
             // Visualization submenu
@@ -1111,6 +1132,14 @@ namespace HvsMvp.App
             menuRelatorios.DropDownItems.Add(CreateMenuItem("📁 Abrir pasta datasets", null, (s, e) => BtnParticulas_Click(s, e)));
             _mainMenuBar.Items.Add(menuRelatorios);
 
+            // ===== PR15: ASSISTENTES (Wizards) Menu =====
+            var menuAssistentes = new ToolStripMenuItem("🧙 Assistentes");
+            menuAssistentes.DropDownItems.Add(CreateMenuItem("🥇 Análise de Ouro (Au) com Live", null, (s, e) => OpenGoldAnalysisWizard()));
+            menuAssistentes.DropDownItems.Add(CreateMenuItem("📷 Análise de Imagem com Laudo", null, (s, e) => OpenImageAnalysisWizard()));
+            menuAssistentes.DropDownItems.Add(new ToolStripSeparator());
+            menuAssistentes.DropDownItems.Add(CreateMenuItem("📋 Verificar Checklist de Sistema", null, (s, e) => ShowSystemChecklist()));
+            _mainMenuBar.Items.Add(menuAssistentes);
+
             // ===== FERRAMENTAS (Tools) Menu =====
             var menuFerramentas = new ToolStripMenuItem("🔧 Ferramentas");
             menuFerramentas.DropDownItems.Add(CreateMenuItem("✅ QA de Partículas...", null, (s, e) => BtnQaPanel_Click(s, e)));
@@ -1120,6 +1149,10 @@ namespace HvsMvp.App
             menuFerramentas.DropDownItems.Add(new ToolStripSeparator());
             menuFerramentas.DropDownItems.Add(CreateMenuItem("🔍 Zoom +", "Ctrl++", (s, e) => BtnZoomMais_Click(s, e)));
             menuFerramentas.DropDownItems.Add(CreateMenuItem("🔍 Zoom -", "Ctrl+-", (s, e) => BtnZoomMenos_Click(s, e)));
+            menuFerramentas.DropDownItems.Add(new ToolStripSeparator());
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("💾 Exportar configurações...", null, (s, e) => ExportConfiguration()));
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("📥 Importar configurações...", null, (s, e) => ImportConfiguration()));
+            menuFerramentas.DropDownItems.Add(CreateMenuItem("📋 Exportar logs de sessão...", null, (s, e) => ExportSessionLogs()));
             _mainMenuBar.Items.Add(menuFerramentas);
 
             // ===== AJUDA (Help) Menu =====
@@ -1203,6 +1236,11 @@ namespace HvsMvp.App
                 {
                     case Keys.F1:
                         BtnAbout_Click(sender, e);
+                        e.Handled = true;
+                        break;
+                    case Keys.F2:
+                        // PR15: Toggle selective mask mode
+                        BtnSelectiveAnalyze_Click(sender, e);
                         e.Handled = true;
                         break;
                     case Keys.F5:
@@ -1581,6 +1619,9 @@ namespace HvsMvp.App
         {
             try { _microscopeCamera.Dispose(); } catch { }
             try { _continuousController?.Stop(); } catch { }
+            
+            // PR15: Dispose session logger
+            try { _sessionLogger?.Dispose(); } catch { }
         }
 
         private void BtnLanguage_Click(object? sender, EventArgs e)
@@ -4076,6 +4117,345 @@ namespace HvsMvp.App
             // Trigger the live button click
             BtnLive_Click(this, EventArgs.Empty);
         }
+        
+        #region PR15: Professional Hardening Features
+        
+        /// <summary>
+        /// PR15: Apply operation profile to show/hide UI elements.
+        /// </summary>
+        private void ApplyOperationProfile(OperationProfile profile)
+        {
+            bool isAdvanced = profile == OperationProfile.Advanced;
+            
+            try
+            {
+                // In Basic mode, hide advanced tools
+                if (_btnTraining != null) _btnTraining.Visible = isAdvanced;
+                if (_btnDebugHvs != null) _btnDebugHvs.Visible = isAdvanced;
+                if (_btnExportIa != null) _btnExportIa.Visible = isAdvanced;
+                if (_btnBiCsv != null) _btnBiCsv.Visible = isAdvanced;
+                if (_chkXrayMode != null) _chkXrayMode.Visible = isAdvanced;
+                if (_chkShowUncertainty != null) _chkShowUncertainty.Visible = isAdvanced;
+                if (_btnPhaseMap != null) _btnPhaseMap.Visible = isAdvanced;
+                
+                // Update status to show current profile
+                string profileName = profile.GetDisplayName();
+                AppendLog($"Perfil de operação: {profileName}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao aplicar perfil: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR15: Show pre-operation checklist before Live mode.
+        /// Returns true if operation should proceed.
+        /// </summary>
+        private bool ShowLiveChecklist()
+        {
+            if (!_appSettings.ShowPreOperationChecklist || _checklistService == null)
+                return true;
+            
+            var result = _checklistService.CheckBeforeLive(_cameraIndex, _cameraWidth, _cameraHeight);
+            
+            if (result.AllOk)
+            {
+                // All OK - proceed without dialog for smooth UX
+                AppendLog("✔ Checklist pré-Live: todos os itens OK.");
+                return true;
+            }
+            
+            return _checklistService.ShowChecklistDialog(this, result, "Iniciar Live");
+        }
+        
+        /// <summary>
+        /// PR15: Show pre-operation checklist before Analysis.
+        /// Returns true if operation should proceed.
+        /// </summary>
+        private bool ShowAnalysisChecklist()
+        {
+            if (!_appSettings.ShowPreOperationChecklist || _checklistService == null)
+                return true;
+            
+            bool hasImage = _pictureSample?.Image != null;
+            string? imagePath = _lastScene?.Summary?.ImagePath;
+            
+            var result = _checklistService.CheckBeforeAnalysis(hasImage, imagePath);
+            
+            if (result.AllOk)
+            {
+                // All OK - proceed without dialog
+                AppendLog("✔ Checklist pré-análise: todos os itens OK.");
+                return true;
+            }
+            
+            return _checklistService.ShowChecklistDialog(this, result, "Executar Análise");
+        }
+        
+        /// <summary>
+        /// PR15: Start a logging session for Live mode.
+        /// </summary>
+        private void StartLiveSession()
+        {
+            if (_sessionLogger != null)
+            {
+                var sessionInfo = _sessionLogger.StartSession("Live", _appSettings.CurrentProfile);
+                AppendLog($"📋 Sessão iniciada: {sessionInfo.SessionId.ToString().Substring(0, 8)}...");
+            }
+        }
+        
+        /// <summary>
+        /// PR15: Start a logging session for Analysis mode.
+        /// </summary>
+        private void StartAnalysisSession()
+        {
+            if (_sessionLogger != null && !_sessionLogger.IsSessionActive)
+            {
+                var sessionInfo = _sessionLogger.StartSession("Analysis", _appSettings.CurrentProfile);
+                AppendLog($"📋 Sessão de análise: {sessionInfo.SessionId.ToString().Substring(0, 8)}...");
+            }
+        }
+        
+        /// <summary>
+        /// PR15: Log an analysis completion event.
+        /// </summary>
+        private void LogAnalysisCompletion(SampleFullAnalysisResult result, long durationMs)
+        {
+            if (_sessionLogger == null) return;
+            
+            var entry = new AnalysisLogEntry
+            {
+                AnalysisId = result.Id,
+                ImageSource = result.ImagePath ?? (_liveRunning ? "Camera Live" : "Memory"),
+                CameraResolution = $"{_cameraWidth}x{_cameraHeight}",
+                ActiveMasks = new List<string> { "HVS" },
+                AiEnabled = false,
+                TargetMaterial = _cbTarget?.SelectedItem?.ToString() ?? "N/A",
+                QualityIndex = result.QualityIndex,
+                QualityStatus = result.QualityStatus,
+                MetalsDetected = result.Metals.Count,
+                ParticlesDetected = result.Particles.Count,
+                DurationMs = durationMs
+            };
+            
+            _sessionLogger.LogAnalysis(entry);
+        }
+        
+        /// <summary>
+        /// PR15: Open the Gold Analysis Wizard.
+        /// </summary>
+        private void OpenGoldAnalysisWizard()
+        {
+            try
+            {
+                using var wizard = new GoldAnalysisWizard(_appSettings, this, _config);
+                if (wizard.ShowDialog(this) == DialogResult.OK && wizard.WizardResult != null)
+                {
+                    var result = wizard.WizardResult;
+                    
+                    // Apply wizard result
+                    if (result.UseCamera)
+                    {
+                        AppendLog("Wizard: Iniciando análise com câmera...");
+                        BtnLive_Click(this, EventArgs.Empty);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(result.ImagePath))
+                    {
+                        AppendLog($"Wizard: Carregando imagem {Path.GetFileName(result.ImagePath)}...");
+                        LoadImageFile(result.ImagePath);
+                        
+                        // Auto-analyze
+                        BtnAnalisar_Click(this, EventArgs.Empty);
+                    }
+                    
+                    // Generate reports if requested
+                    if (result.GeneratePdf && _lastScene?.Summary != null)
+                    {
+                        BtnPdf_Click(this, EventArgs.Empty);
+                    }
+                    if (result.GenerateTxt && _lastScene?.Summary != null)
+                    {
+                        BtnTxt_Click(this, EventArgs.Empty);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro no wizard de análise de ouro: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR15: Open the Image Analysis Wizard (simplified version for image + report).
+        /// </summary>
+        private void OpenImageAnalysisWizard()
+        {
+            // For simplicity, use the same Gold wizard - it handles both cases
+            OpenGoldAnalysisWizard();
+        }
+        
+        /// <summary>
+        /// PR15: Show the system checklist dialog.
+        /// </summary>
+        private void ShowSystemChecklist()
+        {
+            if (_checklistService == null)
+            {
+                AppendLog("Serviço de checklist não inicializado.");
+                return;
+            }
+            
+            var result = _checklistService.CheckBeforeLive(_cameraIndex, _cameraWidth, _cameraHeight);
+            _checklistService.ShowChecklistDialog(this, result, "Verificação de Sistema");
+        }
+        
+        /// <summary>
+        /// PR15: Export configuration to file.
+        /// </summary>
+        private void ExportConfiguration()
+        {
+            try
+            {
+                using var dlg = new SaveFileDialog
+                {
+                    Title = "Exportar configurações",
+                    Filter = "JSON|*.json",
+                    FileName = $"HvsMvp_Config_{DateTime.Now:yyyyMMdd}.json"
+                };
+                
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    var path = _backupService?.ExportConfiguration(_appSettings, dlg.FileName);
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        AppendLog($"Configurações exportadas: {path}");
+                        MessageBox.Show(this,
+                            $"Configurações exportadas com sucesso para:\n\n{path}",
+                            "Exportar Configurações",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao exportar configurações: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR15: Import configuration from file.
+        /// </summary>
+        private void ImportConfiguration()
+        {
+            try
+            {
+                using var dlg = new OpenFileDialog
+                {
+                    Title = "Importar configurações",
+                    Filter = "JSON|*.json"
+                };
+                
+                if (dlg.ShowDialog(this) == DialogResult.OK && _backupService != null)
+                {
+                    // Create backup before importing
+                    _backupService.CreateAutoBackup(_appSettings);
+                    
+                    var (settings, error) = _backupService.ImportConfiguration(dlg.FileName);
+                    
+                    if (error != null)
+                    {
+                        MessageBox.Show(this,
+                            $"Erro ao importar configurações:\n\n{error}",
+                            "Importar Configurações",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
+                        return;
+                    }
+                    
+                    if (settings != null)
+                    {
+                        // Apply imported settings
+                        settings.Save();
+                        _appSettings = settings;
+                        
+                        // Apply to camera
+                        _cameraIndex = _appSettings.DefaultCameraIndex;
+                        _cameraWidth = _appSettings.GetResolutionWidth();
+                        _cameraHeight = _appSettings.GetResolutionHeight();
+                        
+                        // Apply profile
+                        ApplyOperationProfile(_appSettings.CurrentProfile);
+                        
+                        AppendLog("Configurações importadas com sucesso.");
+                        MessageBox.Show(this,
+                            "Configurações importadas com sucesso.\n\nAlgumas alterações podem requerer reinício do aplicativo.",
+                            "Importar Configurações",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao importar configurações: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// PR15: Export session logs to file.
+        /// </summary>
+        private void ExportSessionLogs()
+        {
+            try
+            {
+                if (_sessionLogger == null)
+                {
+                    MessageBox.Show(this,
+                        "O log de sessões não está ativo.\n\nAtive-o em Configurações > Interface.",
+                        "Exportar Logs",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                    return;
+                }
+                
+                // Export current session if active
+                if (_sessionLogger.IsSessionActive)
+                {
+                    var path = _sessionLogger.ExportCurrentSessionLogs("json");
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        AppendLog($"Logs da sessão exportados: {path}");
+                        MessageBox.Show(this,
+                            $"Logs da sessão atual exportados para:\n\n{path}",
+                            "Exportar Logs",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+                else
+                {
+                    // Export logs from last 7 days
+                    var startDate = DateTime.UtcNow.AddDays(-7);
+                    var endDate = DateTime.UtcNow;
+                    var path = _sessionLogger.ExportLogs(startDate, endDate, "json");
+                    
+                    AppendLog($"Logs exportados: {path}");
+                    MessageBox.Show(this,
+                        $"Logs dos últimos 7 dias exportados para:\n\n{path}",
+                        "Exportar Logs",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"Erro ao exportar logs: {ex.Message}");
+            }
+        }
+        
+        #endregion
     }
 
     /// <summary>
