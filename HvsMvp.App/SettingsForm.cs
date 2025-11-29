@@ -45,6 +45,11 @@ namespace HvsMvp.App
 
         // PR10: Interface tab controls
         private CheckBox _chkSkipWelcome = null!;
+        
+        // PR15: Hardening settings controls
+        private ComboBox _cbOperationProfile = null!;
+        private CheckBox _chkShowPreOperationChecklist = null!;
+        private CheckBox _chkEnableSessionLogging = null!;
 
         // Paths info
         private Label _lblCurrentPaths = null!;
@@ -393,7 +398,7 @@ namespace HvsMvp.App
         }
 
         /// <summary>
-        /// PR10: Create Interface tab with welcome screen settings.
+        /// PR10/PR15: Create Interface tab with welcome screen and profile settings.
         /// </summary>
         private void CreateInterfaceTab()
         {
@@ -411,6 +416,34 @@ namespace HvsMvp.App
             };
             tab.Controls.Add(lblInterfaceInfo);
 
+            y += 40;
+
+            // PR15: Operation Profile
+            AddLabel(tab, "Perfil de operação:", 15, y);
+            _cbOperationProfile = new ComboBox
+            {
+                Location = new Point(180, y - 3),
+                Size = new Size(200, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(45, 50, 60),
+                ForeColor = Color.WhiteSmoke
+            };
+            _cbOperationProfile.Items.Add("MVP Rápido (Básico)");
+            _cbOperationProfile.Items.Add("Avançado (Profissional)");
+            tab.Controls.Add(_cbOperationProfile);
+
+            y += 30;
+
+            var lblProfileHint = new Label
+            {
+                Location = new Point(180, y),
+                Size = new Size(320, 35),
+                Text = "Básico: fluxo simplificado | Avançado: todas as ferramentas",
+                ForeColor = Color.FromArgb(150, 160, 180),
+                Font = new Font("Segoe UI", 8)
+            };
+            tab.Controls.Add(lblProfileHint);
+
             y += 45;
 
             _chkSkipWelcome = new CheckBox
@@ -424,15 +457,40 @@ namespace HvsMvp.App
 
             y += 35;
 
-            var lblSkipHint = new Label
+            // PR15: Pre-operation checklist
+            _chkShowPreOperationChecklist = new CheckBox
+            {
+                Location = new Point(15, y),
+                Size = new Size(500, 25),
+                Text = "Mostrar checklist antes de Live/Análise",
+                ForeColor = Color.Gainsboro
+            };
+            tab.Controls.Add(_chkShowPreOperationChecklist);
+
+            y += 35;
+
+            // PR15: Session logging
+            _chkEnableSessionLogging = new CheckBox
+            {
+                Location = new Point(15, y),
+                Size = new Size(500, 25),
+                Text = "Ativar log estruturado de sessões (rastreabilidade)",
+                ForeColor = Color.Gainsboro
+            };
+            tab.Controls.Add(_chkEnableSessionLogging);
+
+            y += 35;
+
+            var lblHint = new Label
             {
                 Location = new Point(35, y),
-                Size = new Size(480, 40),
-                Text = "Quando ativado, a aplicação abre diretamente na janela principal,\npulando a tela de boas-vindas com as opções de início rápido.",
+                Size = new Size(480, 45),
+                Text = "O log estruturado registra ID de sessão, parâmetros, análises e tempo de operação para auditoria e rastreabilidade.",
                 ForeColor = Color.FromArgb(150, 160, 180),
-                Font = new Font("Segoe UI", 8)
+                Font = new Font("Segoe UI", 8),
+                AutoEllipsis = false
             };
-            tab.Controls.Add(lblSkipHint);
+            tab.Controls.Add(lblHint);
 
             _tabControl.TabPages.Add(tab);
         }
@@ -544,8 +602,11 @@ namespace HvsMvp.App
             _txtOperator.Text = _settings.DefaultOperator;
             _txtWhatsAppContact.Text = _settings.WhatsAppContact;
 
-            // PR10: Interface
+            // PR10/PR15: Interface
             _chkSkipWelcome.Checked = _settings.SkipWelcomeScreen;
+            _cbOperationProfile.SelectedIndex = (int)_settings.CurrentProfile;
+            _chkShowPreOperationChecklist.Checked = _settings.ShowPreOperationChecklist;
+            _chkEnableSessionLogging.Checked = _settings.EnableSessionLogging;
 
             UpdateCurrentPathsDisplay();
         }
@@ -606,8 +667,11 @@ namespace HvsMvp.App
             _settings.DefaultOperator = _txtOperator.Text;
             _settings.WhatsAppContact = _txtWhatsAppContact.Text;
 
-            // PR10: Interface
+            // PR10/PR15: Interface
             _settings.SkipWelcomeScreen = _chkSkipWelcome.Checked;
+            _settings.CurrentProfile = (OperationProfile)_cbOperationProfile.SelectedIndex;
+            _settings.ShowPreOperationChecklist = _chkShowPreOperationChecklist.Checked;
+            _settings.EnableSessionLogging = _chkEnableSessionLogging.Checked;
 
             _settings.Save();
 

@@ -57,6 +57,21 @@ namespace HvsMvp.App
         public bool SkipWelcomeScreen { get; set; } = false;
 
         /// <summary>
+        /// PR15: Operation profile (Basic or Advanced).
+        /// </summary>
+        public OperationProfile CurrentProfile { get; set; } = OperationProfile.Basic;
+
+        /// <summary>
+        /// PR15: If true, shows checklist before Live/Analysis operations.
+        /// </summary>
+        public bool ShowPreOperationChecklist { get; set; } = true;
+
+        /// <summary>
+        /// PR15: If true, enables structured session logging.
+        /// </summary>
+        public bool EnableSessionLogging { get; set; } = true;
+
+        /// <summary>
         /// PR13: Recent files list for quick access to previously analyzed images.
         /// Maximum 10 files stored.
         /// </summary>
@@ -160,7 +175,10 @@ namespace HvsMvp.App
                 LogoPath = "",
                 DefaultOperator = "",
                 WhatsAppContact = "",
-                SkipWelcomeScreen = false
+                SkipWelcomeScreen = false,
+                CurrentProfile = OperationProfile.Basic,
+                ShowPreOperationChecklist = true,
+                EnableSessionLogging = true
             };
         }
 
@@ -196,6 +214,9 @@ namespace HvsMvp.App
             DefaultOperator = defaults.DefaultOperator;
             WhatsAppContact = defaults.WhatsAppContact;
             SkipWelcomeScreen = defaults.SkipWelcomeScreen;
+            CurrentProfile = defaults.CurrentProfile;
+            ShowPreOperationChecklist = defaults.ShowPreOperationChecklist;
+            EnableSessionLogging = defaults.EnableSessionLogging;
         }
 
         /// <summary>
